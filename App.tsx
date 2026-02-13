@@ -1,14 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
-import { Settings, Search, Terminal, Activity, AlertCircle, CheckCircle2, RefreshCw, LayoutDashboard, Database, HelpCircle, Sparkles, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Settings, Search, Terminal, Activity, AlertCircle, CheckCircle2, RefreshCw, LayoutDashboard, Database, HelpCircle, Sparkles, ShieldCheck, ShieldAlert, Save, Link } from 'lucide-react';
 import { LokiConfig, LogEntry, AnalysisResult, AppState } from './types';
-import { fetchLogs } from './services/lokiService';
+import { fetchLogs, testConnection } from './services/lokiService';
 import { analyzeLogsWithAI } from './services/geminiService';
 import Dashboard from './components/Dashboard';
 
 const App: React.FC = () => {
   const [config, setConfig] = useState<LokiConfig>({
-    url: '/loki-proxy', // Используем относительный путь для Nginx прокси
+    url: '/loki-proxy',
     token: '',
     query: '{job="varlogs"}',
     limit: 100
@@ -18,13 +18,50 @@ const App: React.FC = () => {
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [state, setState] = useState<AppState>(AppState.IDLE);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'logs' | 'config'>('config');
 
   const isAiReady = !!process.env.API_KEY && process.env.API_KEY !== 'undefined' && process.env.API_KEY !== '';
 
+  // Load config on mount
+  useEffect(() => {
+    const savedConfig = localStorage.getItem('loki_ai_config');
+    if (savedConfig) {
+      try {
+        setConfig(JSON.parse(savedConfig));
+      } catch (e) {
+        console.error("Failed to parse saved config");
+      }
+    }
+  }, []);
+
+  const clearMessages = () => {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+  };
+
+  const handleTestConnection = async () => {
+    clearMessages();
+    setState(AppState.FETCHING);
+    const isOk = await testConnection(config);
+    setState(AppState.IDLE);
+    if (isOk) {
+      setSuccessMessage("Соединение с Loki успешно установлено!");
+    } else {
+      setErrorMessage("Не удалось подключиться к Loki. Проверьте URL и токен.");
+    }
+  };
+
+  const handleSaveConfig = () => {
+    clearMessages();
+    localStorage.setItem('loki_ai_config', JSON.stringify(config));
+    setSuccessMessage("Конфигурация успешно сохранена!");
+    setTimeout(() => setSuccessMessage(null), 3000);
+  };
+
   const handleRun = async () => {
     try {
-      setErrorMessage(null);
+      clearMessages();
       setState(AppState.FETCHING);
       const fetchedLogs = await fetchLogs(config);
       setLogs(fetchedLogs);
@@ -134,7 +171,7 @@ const App: React.FC = () => {
               ) : (
                 <Sparkles size={16} />
               )}
-              {state === AppState.FETCHING ? 'Загрузка...' : state === AppState.ANALYZING ? 'Анализ...' : 'Запуск анализа'}
+              {state === AppState.FETCHING ? 'Загрузка...' : state === AppState.ANALYZING ? 'Анализ...' : 'Запустить анализ'}
             </button>
           </div>
         </header>
@@ -150,16 +187,26 @@ const App: React.FC = () => {
             </div>
           )}
 
+          {successMessage && (
+            <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-start gap-3">
+              <CheckCircle2 className="text-emerald-500 mt-0.5 shrink-0" size={18} />
+              <div>
+                <h4 className="font-bold text-emerald-500 text-sm">Успешно</h4>
+                <p className="text-emerald-400 text-sm mt-1">{successMessage}</p>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'config' && (
             <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="space-y-2">
                 <h2 className="text-3xl font-bold text-white">Конфигурация Loki</h2>
-                <p className="text-slate-400">Настройте источник логов. AI анализ выполняется автоматически через API ключ Gemini.</p>
+                <p className="text-slate-400">Настройте источник данных для анализа.</p>
               </div>
               
               <div className="bg-slate-900 rounded-2xl p-8 border border-slate-800 space-y-6 shadow-xl">
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-300">Loki URL (Internal Proxy)</label>
+                  <label className="text-sm font-semibold text-slate-300">Loki URL</label>
                   <input
                     type="text"
                     value={config.url}
@@ -167,7 +214,6 @@ const App: React.FC = () => {
                     placeholder="/loki-proxy"
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all placeholder:text-slate-600 font-mono text-sm"
                   />
-                  <p className="text-[10px] text-slate-500 italic">По умолчанию используется внутренний прокси Nginx для обхода CORS.</p>
                 </div>
 
                 <div className="space-y-2">
@@ -203,25 +249,21 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="pt-4 flex justify-between items-center">
-                   <div className="flex items-center gap-2">
-                     {isAiReady ? (
-                       <div className="flex items-center gap-1.5 text-xs text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-                         <CheckCircle2 size={12} />
-                         AI Готов
-                       </div>
-                     ) : (
-                       <div className="flex items-center gap-1.5 text-xs text-amber-500 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
-                         <AlertCircle size={12} />
-                         AI недоступен
-                       </div>
-                     )}
-                   </div>
+                <div className="pt-6 flex gap-4">
                    <button 
-                    onClick={handleRun}
-                    className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2"
+                    onClick={handleTestConnection}
+                    disabled={state === AppState.FETCHING}
+                    className="flex-1 bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-xl font-bold border border-slate-700 transition-all flex items-center justify-center gap-2"
                    >
-                     Загрузить {isAiReady && 'и Анализировать'}
+                     {state === AppState.FETCHING ? <RefreshCw size={18} className="animate-spin" /> : <Link size={18} />}
+                     Проверить подключение
+                   </button>
+                   <button 
+                    onClick={handleSaveConfig}
+                    className="flex-1 bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2"
+                   >
+                     <Save size={18} />
+                     Сохранить
                    </button>
                 </div>
               </div>

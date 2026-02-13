@@ -1,10 +1,38 @@
 
 import { LogEntry, LokiConfig } from '../types';
 
+export const testConnection = async (config: LokiConfig): Promise<boolean> => {
+  const { url, token } = config;
+  const baseUrl = url.endsWith('/') ? url.slice(0, -1) : url;
+  const endpoint = `${baseUrl}/loki/api/v1/labels`;
+  
+  const headers: HeadersInit = {
+    'Accept': 'application/json',
+  };
+
+  if (token) {
+    if (token.includes('Basic') || token.includes('Bearer')) {
+        headers['Authorization'] = token;
+    } else {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+  }
+
+  try {
+    const response = await fetch(endpoint, { 
+      headers,
+      signal: AbortSignal.timeout(5000) 
+    });
+    return response.ok;
+  } catch (error) {
+    console.error('Loki connection test failed:', error);
+    return false;
+  }
+};
+
 export const fetchLogs = async (config: LokiConfig): Promise<LogEntry[]> => {
   const { url, token, query, limit } = config;
   
-  // Basic normalization of URL
   const baseUrl = url.endsWith('/') ? url.slice(0, -1) : url;
   const endpoint = `${baseUrl}/loki/api/v1/query_range`;
   
@@ -19,8 +47,6 @@ export const fetchLogs = async (config: LokiConfig): Promise<LogEntry[]> => {
   };
 
   if (token) {
-    // Commonly Loki uses Basic Auth (Username:Password) where one might be the token
-    // For simplicity, we assume the token is a Bearer or the user provides the full Header string
     if (token.includes('Basic') || token.includes('Bearer')) {
         headers['Authorization'] = token;
     } else {
@@ -37,7 +63,6 @@ export const fetchLogs = async (config: LokiConfig): Promise<LogEntry[]> => {
     }
 
     const data = await response.json();
-    
     const logs: LogEntry[] = [];
     
     if (data.status === 'success' && data.data.result) {
@@ -58,7 +83,6 @@ export const fetchLogs = async (config: LokiConfig): Promise<LogEntry[]> => {
       });
     }
 
-    // Sort by timestamp descending
     return logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   } catch (error) {
     console.error('Failed to fetch from Loki:', error);
