@@ -3,13 +3,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.yml
-      network: host
       args:
         - API_KEY=${GEMINI_API_KEY}
     ports:
       - "${APP_PORT:-8080}:80"
     environment:
       - API_KEY=${GEMINI_API_KEY}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     restart: always
