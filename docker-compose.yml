@@ -4,6 +4,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.yml
+      network: host
       args:
         - API_KEY=${GEMINI_API_KEY}
     ports:
@@ -11,4 +12,3 @@ services:
     environment:
       - API_KEY=${GEMINI_API_KEY}
     restart: always
-    # Убедитесь, что сервис loki описан здесь или находится в той же внешней сети
