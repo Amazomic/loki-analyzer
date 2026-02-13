@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile.yml
     ports:
-      - "8080:80"
+      - "${APP_PORT:-8080}:80"
     environment:
       - API_KEY=${GEMINI_API_KEY}
     restart: always
