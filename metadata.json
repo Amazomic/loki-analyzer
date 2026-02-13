@@ -1,0 +1,5 @@
+{
+  "name": "Loki AI Log Analyzer",
+  "description": "A powerful dashboard to fetch logs from Grafana Loki, analyze them using Gemini AI, and receive actionable error resolution recommendations.",
+  "requestFramePermissions": []
+}
