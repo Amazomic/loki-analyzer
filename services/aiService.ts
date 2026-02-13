@@ -8,19 +8,46 @@ export const fetchAvailableModels = async (provider: AIProvider, apiKey?: string
       const res = await fetch('https://openrouter.ai/api/v1/models');
       if (!res.ok) throw new Error('Ошибка при получении моделей OpenRouter');
       const data = await res.json();
-      // Возвращаем список моделей, сортируя по популярности/названию если нужно
+      // Возвращаем список моделей OpenRouter
       return data.data.map((m: any) => ({ id: m.id, name: m.name || m.id }));
     }
     
-    if (provider === 'openai' && apiKey) {
-      const res = await fetch('https://api.openai.com/v1/models', {
-        headers: { 'Authorization': `Bearer ${apiKey}` }
-      });
-      if (!res.ok) throw new Error('Ошибка при получении моделей OpenAI');
-      const data = await res.json();
-      return data.data
-        .filter((m: any) => m.id.startsWith('gpt'))
-        .map((m: any) => ({ id: m.id, name: m.id }));
+    if (provider === 'openai') {
+      // Базовый набор моделей OpenAI, доступный сразу для выбора
+      const defaultOpenAI = [
+        { id: 'gpt-4o', name: 'GPT-4o' },
+        { id: 'gpt-4o-mini', name: 'GPT-4o mini' },
+        { id: 'o1-preview', name: 'o1 Preview' },
+        { id: 'o1-mini', name: 'o1 mini' },
+        { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' }
+      ];
+
+      // Если ключ не введен, показываем список по умолчанию
+      if (!apiKey || apiKey.trim() === '') return defaultOpenAI;
+
+      try {
+        const res = await fetch('https://api.openai.com/v1/models', {
+          headers: { 'Authorization': `Bearer ${apiKey}` }
+        });
+        
+        if (!res.ok) return defaultOpenAI;
+        
+        const data = await res.json();
+        // Фильтруем основные чат-модели: gpt-*, o1-*, o3-*
+        const fetched = data.data
+          .filter((m: any) => 
+            m.id.startsWith('gpt') || 
+            m.id.startsWith('o1') || 
+            m.id.startsWith('o3')
+          )
+          .map((m: any) => ({ id: m.id, name: m.id }))
+          .sort((a: any, b: any) => a.id.localeCompare(b.id));
+        
+        return fetched.length > 0 ? fetched : defaultOpenAI;
+      } catch (error) {
+        console.warn('Could not fetch OpenAI models, using defaults:', error);
+        return defaultOpenAI;
+      }
     }
     
     if (provider === 'gemini') {
@@ -119,7 +146,7 @@ export const analyzeLogsWithAI = async (logs: LogEntry[], config: LokiConfig): P
       method: 'POST',
       headers,
       body: JSON.stringify({
-        model: config.aiModel,
+        model: config.aiModel || (config.aiProvider === 'openai' ? 'gpt-4o-mini' : 'google/gemini-2.0-flash-lite:preview'),
         messages: [{ role: 'user', content: prompt }],
         response_format: { type: "json_object" }
       })
