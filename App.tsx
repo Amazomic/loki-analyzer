@@ -7,7 +7,7 @@ import Dashboard from './components/Dashboard';
 
 const App: React.FC = () => {
   const [config, setConfig] = useState<LokiConfig>({
-    url: window.location.origin + '/loki-proxy',
+    url: '/loki-proxy',
     token: '',
     query: '{job="varlogs"}',
     limit: 100
@@ -51,7 +51,6 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-slate-950 text-slate-200 overflow-hidden font-sans">
-      {/* Sidebar */}
       <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col">
         <div className="p-6 border-b border-slate-800 flex items-center gap-3">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20">
@@ -91,9 +90,7 @@ const App: React.FC = () => {
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
         <header className="h-16 bg-slate-900/50 border-b border-slate-800 px-8 flex items-center justify-between backdrop-blur-md sticky top-0 z-10">
           <div className="flex items-center gap-2">
             <span className="text-slate-400">Section</span>
@@ -121,7 +118,6 @@ const App: React.FC = () => {
           </div>
         </header>
 
-        {/* Viewport */}
         <div className="flex-1 overflow-y-auto p-8 bg-[#020617]">
           {errorMessage && (
             <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-start gap-3">
@@ -137,29 +133,29 @@ const App: React.FC = () => {
             <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="space-y-2">
                 <h2 className="text-3xl font-bold text-white">Loki Configuration</h2>
-                <p className="text-slate-400">Connect your Grafana Loki instance to start monitoring.</p>
+                <p className="text-slate-400">Connect your Grafana Loki instance via Nginx Proxy.</p>
               </div>
               
               <div className="bg-slate-900 rounded-2xl p-8 border border-slate-800 space-y-6 shadow-xl">
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-300">Loki Endpoint</label>
+                  <label className="text-sm font-semibold text-slate-300">Loki Endpoint (Proxied)</label>
                   <input
                     type="text"
                     value={config.url}
                     onChange={(e) => setConfig({ ...config, url: e.target.value })}
-                    placeholder="https://logs.example.com"
+                    placeholder="/loki-proxy"
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all placeholder:text-slate-600"
                   />
-                  <p className="text-[10px] text-slate-500 italic">Pro-tip: Use "/loki-proxy" for local docker setup.</p>
+                  <p className="text-[10px] text-slate-500 italic">Default: /loki-proxy (Configured in Nginx)</p>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-300">API Token / Basic Auth</label>
+                  <label className="text-sm font-semibold text-slate-300">API Token / Basic Auth (Optional)</label>
                   <input
                     type="password"
                     value={config.token}
                     onChange={(e) => setConfig({ ...config, token: e.target.value })}
-                    placeholder="Enter your bearer token or auth header"
+                    placeholder="Enter your bearer token"
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all placeholder:text-slate-600"
                   />
                 </div>
@@ -171,7 +167,7 @@ const App: React.FC = () => {
                       type="text"
                       value={config.query}
                       onChange={(e) => setConfig({ ...config, query: e.target.value })}
-                      placeholder='{app="api"}'
+                      placeholder='{job="varlogs"}'
                       className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all font-mono text-sm"
                     />
                   </div>
@@ -195,16 +191,6 @@ const App: React.FC = () => {
                    </button>
                 </div>
               </div>
-
-              <div className="bg-blue-900/10 border border-blue-500/20 rounded-2xl p-6 flex items-start gap-4">
-                <HelpCircle className="text-blue-400 mt-1 shrink-0" />
-                <div className="text-sm text-blue-200/80 leading-relaxed">
-                  <p className="font-semibold text-blue-300 mb-1">How it works</p>
-                  1. We fetch logs using LogQL from your Loki instance.<br/>
-                  2. We filter for common error patterns and stack traces.<br/>
-                  3. Gemini AI analyzes the context and provides specific recommendations.
-                </div>
-              </div>
             </div>
           )}
 
@@ -215,9 +201,6 @@ const App: React.FC = () => {
                    <div className="flex items-center gap-2">
                      <Terminal size={16} className="text-slate-400" />
                      <span className="text-sm font-bold uppercase tracking-widest text-slate-400">Raw Logs</span>
-                   </div>
-                   <div className="text-xs text-slate-500 font-mono">
-                     Showing {logs.length} entries
                    </div>
                  </div>
                  <div className="p-6 font-mono text-xs leading-relaxed overflow-x-auto h-[70vh] custom-scrollbar">
@@ -259,13 +242,6 @@ const App: React.FC = () => {
 
           {activeTab === 'dashboard' && analysis && (
             <Dashboard logs={logs} analysis={analysis} />
-          )}
-
-          {activeTab === 'dashboard' && !analysis && state === AppState.IDLE && (
-            <div className="h-full flex flex-col items-center justify-center text-slate-500 animate-pulse">
-               <Activity size={64} strokeWidth={1} />
-               <p className="mt-6 text-xl">Run an analysis to see insights here.</p>
-            </div>
           )}
         </div>
       </main>
