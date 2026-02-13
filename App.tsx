@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Settings, Search, Terminal, Activity, AlertCircle, CheckCircle2, RefreshCw, BarChart3, LayoutDashboard, Database, HelpCircle } from 'lucide-react';
 import { LokiConfig, LogEntry, AnalysisResult, AppState } from './types';
@@ -8,7 +7,7 @@ import Dashboard from './components/Dashboard';
 
 const App: React.FC = () => {
   const [config, setConfig] = useState<LokiConfig>({
-    url: 'http://localhost:3100',
+    url: window.location.origin + '/loki-proxy',
     token: '',
     query: '{job="varlogs"}',
     limit: 100
@@ -151,6 +150,7 @@ const App: React.FC = () => {
                     placeholder="https://logs.example.com"
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all placeholder:text-slate-600"
                   />
+                  <p className="text-[10px] text-slate-500 italic">Pro-tip: Use "/loki-proxy" for local docker setup.</p>
                 </div>
 
                 <div className="space-y-2">
