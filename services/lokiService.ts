@@ -23,7 +23,7 @@ export const testConnection = async (config: LokiConfig): Promise<boolean> => {
   try {
     const response = await fetch(endpoint, { 
       headers: getHeaders(config.token),
-      signal: AbortSignal.timeout(5000) // 5 second timeout
+      signal: AbortSignal.timeout(5000)
     });
     return response.ok;
   } catch (error) {
@@ -51,7 +51,7 @@ export const fetchLogs = async (config: LokiConfig): Promise<LogEntry[]> => {
     
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Ошибка Loki (${response.status}): ${errorText || response.statusText}`);
+      throw new Error(`Loki API Error (${response.status}): ${errorText || response.statusText}`);
     }
 
     const data = await response.json();
@@ -64,13 +64,34 @@ export const fetchLogs = async (config: LokiConfig): Promise<LogEntry[]> => {
           const timestamp = new Date(parseInt(nanoTs) / 1000000).toISOString();
           
           let level: LogEntry['level'] = 'unknown';
-          const lowerLine = line.toLowerCase();
-          if (lowerLine.includes('error') || lowerLine.includes('fatal') || lowerLine.includes('crit') || lowerLine.includes('err')) level = 'error';
-          else if (lowerLine.includes('warn')) level = 'warn';
-          else if (lowerLine.includes('debug')) level = 'debug';
-          else if (lowerLine.includes('info')) level = 'info';
+          let displayLine = line;
 
-          logs.push({ timestamp, line, level });
+          // Попытка распарсить JSON если строка похожа на объект
+          if (line.trim().startsWith('{')) {
+            try {
+              const parsed = JSON.parse(line);
+              const extractedLevel = (parsed.level || parsed.lvl || parsed.severity || '').toLowerCase();
+              displayLine = parsed.message || parsed.msg || line;
+              
+              if (['error', 'err', 'fatal', 'panic', 'crit'].some(s => extractedLevel.includes(s))) level = 'error';
+              else if (extractedLevel.includes('warn')) level = 'warn';
+              else if (extractedLevel.includes('debug')) level = 'debug';
+              else if (extractedLevel.includes('info')) level = 'info';
+            } catch (e) {
+              // Игнорируем ошибку парсинга, используем текстовый поиск
+            }
+          }
+
+          // Если уровень всё еще не определен, ищем по тексту
+          if (level === 'unknown') {
+            const lowerLine = line.toLowerCase();
+            if (['error', 'fatal', 'crit', 'err', 'exception'].some(s => lowerLine.includes(s))) level = 'error';
+            else if (lowerLine.includes('warn')) level = 'warn';
+            else if (lowerLine.includes('debug')) level = 'debug';
+            else if (lowerLine.includes('info')) level = 'info';
+          }
+
+          logs.push({ timestamp, line: displayLine, level });
         });
       });
     }
