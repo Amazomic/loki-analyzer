@@ -1,10 +1,15 @@
 
+export type AIProvider = 'gemini' | 'openai' | 'openrouter';
+
 export interface LokiConfig {
   url: string;
   token: string;
   query: string;
   limit: number;
-  range: string; // Период: 1h, 6h, 24h, 7d и т.д.
+  range: string;
+  aiProvider: AIProvider;
+  aiKey: string;
+  aiModel: string;
 }
 
 export interface LogEntry {
