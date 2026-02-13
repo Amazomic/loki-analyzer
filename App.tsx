@@ -1,10 +1,36 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Settings, Terminal, Activity, AlertCircle, RefreshCw, Database, Sparkles, ShieldCheck, Link, ChevronRight, Info, XCircle, Check, X, Search, ListFilter, Clock, LayoutDashboard, Key, Cpu, RefreshCcw, ChevronDown, ChevronUp } from 'lucide-react';
+import { Settings, Terminal, Activity, AlertCircle, RefreshCw, Database, Sparkles, ShieldCheck, Link, ChevronRight, Info, XCircle, Check, X, Search, ListFilter, Clock, LayoutDashboard, Key, Cpu, RefreshCcw, ChevronDown, ChevronUp, BrainCircuit } from 'lucide-react';
 import { LokiConfig, LogEntry, AnalysisResult, AppState, AIProvider } from './types';
 import { fetchLogs, testConnection } from './services/lokiService';
 import { analyzeLogsWithAI, fetchAvailableModels } from './services/aiService';
 import Dashboard from './components/Dashboard';
+
+const AnalysisLoadingSkeleton = () => (
+  <div className="space-y-8 animate-pulse">
+    <div className="flex items-center gap-3 mb-6">
+      <BrainCircuit size={24} className="text-blue-500/50" />
+      <div className="h-8 w-64 bg-slate-800 rounded-lg"></div>
+    </div>
+    
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {[1, 2, 3].map(i => (
+        <div key={i} className="bg-slate-900/50 p-6 rounded-2xl border border-slate-800 h-24"></div>
+      ))}
+    </div>
+
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-800 h-64"></div>
+      <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-800 h-64 space-y-4">
+        <div className="h-4 w-1/2 bg-slate-800 rounded"></div>
+        <div className="h-20 w-full bg-slate-800 rounded-xl"></div>
+        <div className="h-16 w-full bg-slate-800 rounded-xl"></div>
+      </div>
+    </div>
+    
+    <div className="bg-slate-900/50 rounded-2xl border border-slate-800 h-48"></div>
+  </div>
+);
 
 const App: React.FC = () => {
   const defaultLokiUrl = process.env.LOKI_URL || 'http://192.168.20.96:3100';
@@ -111,6 +137,8 @@ const App: React.FC = () => {
       if (currentLogs.length > 0) {
         setState(AppState.ANALYZING);
         setIsLogsCollapsed(true);
+        // Сбрасываем старый анализ, чтобы показать скелетон
+        setAnalysis(null);
         const aiResult = await analyzeLogsWithAI(currentLogs, config);
         setAnalysis(aiResult);
         setState(AppState.IDLE);
@@ -444,7 +472,13 @@ const App: React.FC = () => {
           </div>
         </section>
 
-        {analysis && (
+        {state === AppState.ANALYZING && (
+          <section className="animate-in fade-in slide-in-from-top-4 duration-500">
+            <AnalysisLoadingSkeleton />
+          </section>
+        )}
+
+        {analysis && state !== AppState.ANALYZING && (
           <section className="animate-in fade-in slide-in-from-top-4 duration-700">
             <Dashboard logs={logs} analysis={analysis} />
           </section>
@@ -454,7 +488,7 @@ const App: React.FC = () => {
       <footer className="max-w-7xl mx-auto px-10 py-10 border-t border-slate-900 flex flex-col md:flex-row items-center justify-between gap-6 opacity-40 hover:opacity-100 transition-opacity">
         <div className="flex items-center gap-3">
           <Activity size={16} />
-          <span className="font-bold text-[10px] uppercase tracking-[0.2em]">Loki AI Engine v2.4</span>
+          <span className="font-bold text-[10px] uppercase tracking-[0.2em]">Loki AI Engine v2.5</span>
         </div>
         <p className="text-[9px] text-slate-500 font-medium">© 2024 Анализатор логов. Обработка: {config.aiProvider.toUpperCase()}.</p>
       </footer>
