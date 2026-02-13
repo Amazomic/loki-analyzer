@@ -9,23 +9,25 @@ export const analyzeLogsWithAI = async (logs: LogEntry[]): Promise<AnalysisResul
 
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
-    contents: `Analyze these logs from a Loki instance. Focus on identifying patterns, recurring errors, and providing specific troubleshooting steps. 
+    contents: `Проанализируй эти логи из инстанса Loki. Твоя задача — выявить закономерности, повторяющиеся ошибки и предоставить конкретные шаги по устранению неполадок. 
     
-    LOGS:
+    ВАЖНО: Весь твой ответ (summary, description, title, action) должен быть СТРОГО НА РУССКОМ ЯЗЫКЕ.
+    
+    ЛОГИ ДЛЯ АНАЛИЗА:
     ${logContent}`,
     config: {
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
         properties: {
-          summary: { type: Type.STRING, description: "A high-level summary of the logs." },
+          summary: { type: Type.STRING, description: "Краткий обзор состояния логов на русском языке." },
           detectedErrors: {
             type: Type.ARRAY,
             items: {
               type: Type.OBJECT,
               properties: {
-                type: { type: Type.STRING },
-                description: { type: Type.STRING },
+                type: { type: Type.STRING, description: "Тип ошибки (на русском)." },
+                description: { type: Type.STRING, description: "Описание проблемы (на русском)." },
                 count: { type: Type.NUMBER }
               },
               required: ["type", "description", "count"]
@@ -36,8 +38,8 @@ export const analyzeLogsWithAI = async (logs: LogEntry[]): Promise<AnalysisResul
             items: {
               type: Type.OBJECT,
               properties: {
-                title: { type: Type.STRING },
-                action: { type: Type.STRING },
+                title: { type: Type.STRING, description: "Заголовок рекомендации (на русском)." },
+                action: { type: Type.STRING, description: "Конкретное действие для исправления (на русском)." },
                 priority: { type: Type.STRING, enum: ["low", "medium", "high"] }
               },
               required: ["title", "action", "priority"]
@@ -50,7 +52,7 @@ export const analyzeLogsWithAI = async (logs: LogEntry[]): Promise<AnalysisResul
   });
 
   const text = response.text;
-  if (!text) throw new Error("AI returned empty analysis");
+  if (!text) throw new Error("AI вернул пустой анализ");
   
   return JSON.parse(text) as AnalysisResult;
 };

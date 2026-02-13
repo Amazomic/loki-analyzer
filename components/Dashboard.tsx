@@ -2,8 +2,7 @@
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
 import { LogEntry, AnalysisResult } from '../types';
-// Fix: Added BarChart3 to the lucide-react imports
-import { CheckCircle2, AlertTriangle, Lightbulb, Zap, TrendingUp, ShieldAlert, MessageSquareText, BarChart3 } from 'lucide-react';
+import { AlertTriangle, Lightbulb, Zap, TrendingUp, ShieldAlert, MessageSquareText, BarChart3 } from 'lucide-react';
 
 interface DashboardProps {
   logs: LogEntry[];
@@ -17,17 +16,18 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, analysis }) => {
   }, {});
 
   const chartData = [
-    { name: 'Errors', value: levelCounts.error || 0, color: '#ef4444' },
-    { name: 'Warnings', value: levelCounts.warn || 0, color: '#f59e0b' },
-    { name: 'Info', value: levelCounts.info || 0, color: '#3b82f6' },
-    { name: 'Debug', value: levelCounts.debug || 0, color: '#8b5cf6' },
-    { name: 'Unknown', value: levelCounts.unknown || 0, color: '#64748b' },
+    { name: 'Ошибки', value: levelCounts.error || 0, color: '#ef4444' },
+    { name: 'Предупреждения', value: levelCounts.warn || 0, color: '#f59e0b' },
+    { name: 'Инфо', value: levelCounts.info || 0, color: '#3b82f6' },
+    { name: 'Отладка', value: levelCounts.debug || 0, color: '#8b5cf6' },
+    { name: 'Неизвестно', value: levelCounts.unknown || 0, color: '#64748b' },
   ].filter(d => d.value > 0);
 
-  const errorData = analysis.detectedErrors.map(e => ({
-    name: e.type.length > 20 ? e.type.substring(0, 20) + '...' : e.type,
-    count: e.count
-  }));
+  const priorityMap: Record<string, string> = {
+    high: 'Высокий',
+    medium: 'Средний',
+    low: 'Низкий'
+  };
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in zoom-in-95 duration-700">
@@ -38,7 +38,7 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, analysis }) => {
              <ShieldAlert className="text-red-500" size={32} />
            </div>
            <div>
-             <p className="text-slate-400 text-sm font-medium">Critical Errors</p>
+             <p className="text-slate-400 text-sm font-medium">Критические ошибки</p>
              <h3 className="text-3xl font-bold text-white">{levelCounts.error || 0}</h3>
            </div>
         </div>
@@ -47,7 +47,7 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, analysis }) => {
              <AlertTriangle className="text-amber-500" size={32} />
            </div>
            <div>
-             <p className="text-slate-400 text-sm font-medium">Warnings</p>
+             <p className="text-slate-400 text-sm font-medium">Предупреждения</p>
              <h3 className="text-3xl font-bold text-white">{levelCounts.warn || 0}</h3>
            </div>
         </div>
@@ -56,7 +56,7 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, analysis }) => {
              <TrendingUp className="text-blue-500" size={32} />
            </div>
            <div>
-             <p className="text-slate-400 text-sm font-medium">Total Analyzed</p>
+             <p className="text-slate-400 text-sm font-medium">Всего в логах</p>
              <h3 className="text-3xl font-bold text-white">{logs.length}</h3>
            </div>
         </div>
@@ -68,7 +68,7 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, analysis }) => {
           <div className="flex items-center justify-between">
             <h3 className="text-xl font-bold flex items-center gap-2">
               <BarChart3 className="text-blue-400" size={20} />
-              Distribution
+              Распределение уровней
             </h3>
           </div>
           <div className="h-64">
@@ -109,7 +109,7 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, analysis }) => {
           <div className="flex items-center justify-between">
             <h3 className="text-xl font-bold flex items-center gap-2">
               <MessageSquareText className="text-purple-400" size={20} />
-              AI Insight
+              AI Анализ
             </h3>
             <div className="px-3 py-1 bg-purple-500/10 border border-purple-500/20 rounded-full text-[10px] font-bold text-purple-400 uppercase tracking-widest">
               Gemini 3 Flash
@@ -120,7 +120,7 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, analysis }) => {
           </div>
           
           <div className="pt-4 border-t border-slate-800 space-y-4">
-            <p className="text-xs font-bold text-slate-500 uppercase">Top Detected Issues</p>
+            <p className="text-xs font-bold text-slate-500 uppercase">Обнаруженные проблемы</p>
             <div className="space-y-3">
               {analysis.detectedErrors.map((err, i) => (
                 <div key={i} className="flex items-start justify-between bg-slate-950/50 p-4 rounded-xl border border-slate-800">
@@ -143,9 +143,9 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, analysis }) => {
         <div className="p-8 bg-gradient-to-r from-blue-600/10 to-transparent border-b border-slate-800">
           <h3 className="text-2xl font-bold flex items-center gap-3">
             <Zap className="text-amber-400 fill-amber-400/20" size={28} />
-            Remediation Guide
+            План исправления
           </h3>
-          <p className="text-slate-400 mt-1">Step-by-step instructions to stabilize your services.</p>
+          <p className="text-slate-400 mt-1">Пошаговое руководство по стабилизации сервисов.</p>
         </div>
         <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
           {analysis.recommendations.map((rec, i) => (
@@ -156,7 +156,7 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, analysis }) => {
                   rec.priority === 'medium' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' :
                   'bg-blue-500/10 text-blue-500 border border-blue-500/20'
                 }`}>
-                  {rec.priority} priority
+                  Приоритет: {priorityMap[rec.priority] || rec.priority}
                 </div>
                 <div className="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center group-hover:bg-blue-600 transition-colors">
                   <Lightbulb size={16} className="text-slate-500 group-hover:text-white" />
@@ -166,7 +166,7 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, analysis }) => {
               <p className="text-slate-400 text-sm leading-relaxed">{rec.action}</p>
               
               <button className="mt-6 flex items-center gap-2 text-xs font-bold text-blue-400 hover:text-blue-300 transition-colors uppercase tracking-wider">
-                View related logs <TrendingUp size={12} />
+                Связать с логами <TrendingUp size={12} />
               </button>
             </div>
           ))}
