@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Settings, Search, Terminal, Activity, AlertCircle, CheckCircle2, RefreshCw, BarChart3, LayoutDashboard, Database, HelpCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Settings, Search, Terminal, Activity, AlertCircle, RefreshCw, LayoutDashboard, Database, HelpCircle } from 'lucide-react';
 import { LokiConfig, LogEntry, AnalysisResult, AppState } from './types';
 import { fetchLogs } from './services/lokiService';
 import { analyzeLogsWithAI } from './services/geminiService';
@@ -23,6 +23,8 @@ const App: React.FC = () => {
     try {
       setErrorMessage(null);
       setState(AppState.FETCHING);
+      
+      // Выполняем запрос к прокси
       const fetchedLogs = await fetchLogs(config);
       setLogs(fetchedLogs);
       
@@ -34,23 +36,24 @@ const App: React.FC = () => {
         setActiveTab('dashboard');
       } else {
         setState(AppState.IDLE);
-        setErrorMessage("No logs found matching the filter.");
+        setErrorMessage("Логи не найдены. Проверьте запрос LogQL или подключение к Loki.");
       }
     } catch (err: any) {
-      console.error(err);
+      console.error('Analysis failed:', err);
       setState(AppState.ERROR);
-      setErrorMessage(err.message || "An unknown error occurred.");
+      setErrorMessage(err.message || "Произошла ошибка при работе с API.");
     }
   };
 
   const navItems = [
-    { id: 'config', label: 'Setup', icon: Settings },
-    { id: 'logs', label: 'Log Explorer', icon: Terminal },
-    { id: 'dashboard', label: 'AI Analysis', icon: LayoutDashboard },
+    { id: 'config', label: 'Настройка', icon: Settings },
+    { id: 'logs', label: 'Просмотр логов', icon: Terminal },
+    { id: 'dashboard', label: 'AI Анализ', icon: LayoutDashboard },
   ];
 
   return (
     <div className="flex h-screen bg-slate-950 text-slate-200 overflow-hidden font-sans">
+      {/* Sidebar */}
       <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col">
         <div className="p-6 border-b border-slate-800 flex items-center gap-3">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20">
@@ -80,20 +83,21 @@ const App: React.FC = () => {
           <div className="p-4 bg-slate-800/50 rounded-xl space-y-3">
             <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">
               <Database size={12} />
-              Loki Status
+              Статус
             </div>
             <div className="flex items-center gap-2">
               <div className={`w-2 h-2 rounded-full ${state === AppState.ERROR ? 'bg-red-500' : 'bg-green-500'}`} />
-              <span className="text-sm font-medium">{state === AppState.ERROR ? 'Connection Error' : 'Ready'}</span>
+              <span className="text-sm font-medium">{state === AppState.ERROR ? 'Ошибка подключения' : 'Готов'}</span>
             </div>
           </div>
         </div>
       </aside>
 
+      {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden">
         <header className="h-16 bg-slate-900/50 border-b border-slate-800 px-8 flex items-center justify-between backdrop-blur-md sticky top-0 z-10">
           <div className="flex items-center gap-2">
-            <span className="text-slate-400">Section</span>
+            <span className="text-slate-400">Раздел</span>
             <span className="text-slate-600">/</span>
             <span className="font-semibold text-slate-100 capitalize">{activeTab}</span>
           </div>
@@ -113,7 +117,7 @@ const App: React.FC = () => {
               ) : (
                 <Search size={16} />
               )}
-              {state === AppState.FETCHING ? 'Fetching...' : state === AppState.ANALYZING ? 'Analyzing...' : 'Analyze Logs'}
+              {state === AppState.FETCHING ? 'Загрузка...' : state === AppState.ANALYZING ? 'Анализ...' : 'Запустить анализ'}
             </button>
           </div>
         </header>
@@ -123,7 +127,7 @@ const App: React.FC = () => {
             <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-start gap-3">
               <AlertCircle className="text-red-500 mt-0.5 shrink-0" size={18} />
               <div>
-                <h4 className="font-bold text-red-500 text-sm">Operation Failed</h4>
+                <h4 className="font-bold text-red-500 text-sm">Ошибка</h4>
                 <p className="text-red-400 text-sm mt-1">{errorMessage}</p>
               </div>
             </div>
@@ -132,47 +136,45 @@ const App: React.FC = () => {
           {activeTab === 'config' && (
             <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="space-y-2">
-                <h2 className="text-3xl font-bold text-white">Loki Configuration</h2>
-                <p className="text-slate-400">Connect your Grafana Loki instance via Nginx Proxy.</p>
+                <h2 className="text-3xl font-bold text-white">Параметры Loki</h2>
+                <p className="text-slate-400">Настройте подключение через прокси (Nginx).</p>
               </div>
               
               <div className="bg-slate-900 rounded-2xl p-8 border border-slate-800 space-y-6 shadow-xl">
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-300">Loki Endpoint (Proxied)</label>
+                  <label className="text-sm font-semibold text-slate-300">Loki Proxy URL</label>
                   <input
                     type="text"
                     value={config.url}
                     onChange={(e) => setConfig({ ...config, url: e.target.value })}
-                    placeholder="/loki-proxy"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all placeholder:text-slate-600"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all font-mono"
                   />
-                  <p className="text-[10px] text-slate-500 italic">Default: /loki-proxy (Configured in Nginx)</p>
+                  <p className="text-[10px] text-slate-500 italic">Оставьте "/loki-proxy", если используете стандартный nginx.conf</p>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-300">API Token / Basic Auth (Optional)</label>
+                  <label className="text-sm font-semibold text-slate-300">Authorization (Optional)</label>
                   <input
                     type="password"
                     value={config.token}
                     onChange={(e) => setConfig({ ...config, token: e.target.value })}
-                    placeholder="Enter your bearer token"
+                    placeholder="Basic dXNlcjpwYXNz"
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all placeholder:text-slate-600"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold text-slate-300">LogQL Filter</label>
+                    <label className="text-sm font-semibold text-slate-300">LogQL Query</label>
                     <input
                       type="text"
                       value={config.query}
                       onChange={(e) => setConfig({ ...config, query: e.target.value })}
-                      placeholder='{job="varlogs"}'
                       className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all font-mono text-sm"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold text-slate-300">Limit</label>
+                    <label className="text-sm font-semibold text-slate-300">Лимит строк</label>
                     <input
                       type="number"
                       value={config.limit}
@@ -185,10 +187,18 @@ const App: React.FC = () => {
                 <div className="pt-4 flex justify-end">
                    <button 
                     onClick={handleRun}
-                    className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2"
+                    className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-blue-500/20 transition-all"
                    >
-                     Test Connection & Analyze
+                     Проверить и проанализировать
                    </button>
+                </div>
+              </div>
+
+              <div className="bg-blue-900/10 border border-blue-500/20 rounded-2xl p-6 flex items-start gap-4">
+                <HelpCircle className="text-blue-400 mt-1 shrink-0" />
+                <div className="text-sm text-blue-200/80 leading-relaxed">
+                  <p className="font-semibold text-blue-300 mb-1">Как работает прокси</p>
+                  Запросы идут на <code className="bg-blue-500/20 px-1 rounded">/loki-proxy</code> вашего Nginx, который перенаправляет их на <code className="bg-blue-500/20 px-1 rounded">http://host.docker.internal:3100</code>.
                 </div>
               </div>
             </div>
@@ -209,7 +219,7 @@ const App: React.FC = () => {
                        <tbody>
                          {logs.map((log, idx) => (
                            <tr key={idx} className="hover:bg-slate-800/50 transition-colors group">
-                             <td className="pr-4 py-1 text-slate-500 align-top whitespace-nowrap opacity-60 group-hover:opacity-100 transition-opacity">
+                             <td className="pr-4 py-1 text-slate-500 align-top whitespace-nowrap opacity-60">
                                {log.timestamp}
                              </td>
                              <td className="pr-3 py-1 align-top">
@@ -222,7 +232,7 @@ const App: React.FC = () => {
                                  {log.level}
                                </span>
                              </td>
-                             <td className="py-1 text-slate-300 break-all opacity-90 group-hover:opacity-100">
+                             <td className="py-1 text-slate-300 break-all">
                                {log.line}
                              </td>
                            </tr>
@@ -232,7 +242,7 @@ const App: React.FC = () => {
                    ) : (
                      <div className="h-full flex flex-col items-center justify-center text-slate-600 gap-4">
                        <Terminal size={48} />
-                       <p className="text-lg">No logs loaded. Click 'Analyze Logs' to fetch data.</p>
+                       <p className="text-lg">Нет загруженных логов.</p>
                      </div>
                    )}
                  </div>
