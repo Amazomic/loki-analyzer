@@ -3,15 +3,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.yml
+      args:
+        - API_KEY=${GEMINI_API_KEY}
     ports:
       - "${APP_PORT:-8080}:80"
     environment:
       - API_KEY=${GEMINI_API_KEY}
     restart: always
-
-  # Optional: Local Loki for testing
-  # loki:
-  #   image: grafana/loki:latest
-  #   ports:
-  #     - "3100:3100"
-  #   command: -config.file=/etc/loki/local-config.yaml
