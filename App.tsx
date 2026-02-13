@@ -7,8 +7,9 @@ import { analyzeLogsWithAI } from './services/geminiService';
 import Dashboard from './components/Dashboard';
 
 const App: React.FC = () => {
+  // Use relative path for the proxy by default
   const [config, setConfig] = useState<LokiConfig>({
-    url: 'http://localhost:3100',
+    url: window.location.origin + '/loki-proxy',
     token: '',
     query: '{job="varlogs"}',
     limit: 100
@@ -48,7 +49,7 @@ const App: React.FC = () => {
     } catch (err: any) {
       console.error(err);
       setState(AppState.ERROR);
-      setErrorMessage(err.message || "An unknown error occurred.");
+      setErrorMessage(err.message || "An unknown error occurred. Check if Loki is accessible at " + config.url);
     }
   };
 
@@ -163,14 +164,15 @@ const App: React.FC = () => {
               
               <div className="bg-slate-900 rounded-2xl p-8 border border-slate-800 space-y-6 shadow-xl">
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-300">Loki URL</label>
+                  <label className="text-sm font-semibold text-slate-300">Loki URL (Internal Proxy)</label>
                   <input
                     type="text"
                     value={config.url}
                     onChange={(e) => setConfig({ ...config, url: e.target.value })}
-                    placeholder="http://loki:3100"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all placeholder:text-slate-600"
+                    placeholder="/loki-proxy"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all placeholder:text-slate-600 font-mono text-sm"
                   />
+                  <p className="text-[10px] text-slate-500 italic">By default, we use the internal Nginx proxy to avoid CORS issues.</p>
                 </div>
 
                 <div className="space-y-2">
@@ -182,7 +184,6 @@ const App: React.FC = () => {
                     placeholder="Bearer token or Basic Auth header"
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all placeholder:text-slate-600"
                   />
-                  <p className="text-[10px] text-slate-500 italic">This is for authenticating with your Loki server, not for the AI.</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-6">
@@ -233,8 +234,8 @@ const App: React.FC = () => {
               <div className="bg-blue-900/10 border border-blue-500/20 rounded-2xl p-6 flex items-start gap-4">
                 <HelpCircle className="text-blue-400 mt-1 shrink-0" />
                 <div className="text-sm text-blue-200/80 leading-relaxed">
-                  <p className="font-semibold text-blue-300 mb-1">Environment Configuration</p>
-                  LokiEye AI is designed to run in a controlled environment. The Gemini API key is managed via <code className="bg-slate-800 px-1 rounded text-blue-300">GEMINI_API_KEY</code> in your docker-compose or .env file. You only need to provide Loki access details here.
+                  <p className="font-semibold text-blue-300 mb-1">CORS & Networking</p>
+                  To prevent CORS errors, requests are proxied through <code className="bg-slate-800 px-1 rounded text-blue-300">/loki-proxy</code>. Ensure your Loki container is named <code className="bg-slate-800 px-1 rounded text-blue-300">loki</code> and is on the same network as this analyzer.
                 </div>
               </div>
             </div>
