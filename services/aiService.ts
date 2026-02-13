@@ -19,12 +19,11 @@ export const analyzeLogsWithAI = async (logs: LogEntry[], config: LokiConfig): P
     ${logContent}`;
 
   if (config.aiProvider === 'gemini') {
-    // В соответствии с правилами, для Gemini используем системный ключ или пользовательский, если системный отсутствует
     const apiKey = config.aiKey || process.env.API_KEY;
     const ai = new GoogleGenAI({ apiKey: apiKey as string });
     
     const response = await ai.models.generateContent({
-      model: config.aiModel || "gemini-2.5-flash-preview",
+      model: config.aiModel || "gemini-3-flash-preview",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -66,7 +65,6 @@ export const analyzeLogsWithAI = async (logs: LogEntry[], config: LokiConfig): P
     if (!text) throw new Error("AI вернул пустой анализ");
     return JSON.parse(text) as AnalysisResult;
   } else {
-    // OpenAI или OpenRouter
     const endpoint = config.aiProvider === 'openai' 
       ? 'https://api.openai.com/v1/chat/completions' 
       : 'https://openrouter.ai/api/v1/chat/completions';
@@ -85,7 +83,7 @@ export const analyzeLogsWithAI = async (logs: LogEntry[], config: LokiConfig): P
       method: 'POST',
       headers,
       body: JSON.stringify({
-        model: config.aiModel || (config.aiProvider === 'openai' ? 'gpt-4o-mini' : 'google/gemini-2.5-flash-lite:free'),
+        model: config.aiModel || (config.aiProvider === 'openai' ? 'gpt-4o-mini' : 'google/gemini-2.0-flash-lite:preview'),
         messages: [{ role: 'user', content: prompt }],
         response_format: { type: "json_object" }
       })

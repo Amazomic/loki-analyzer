@@ -360,35 +360,34 @@ const App: React.FC = () => {
           </div>
 
           <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl flex flex-col min-h-[500px]">
-            <div className="p-4 bg-slate-800/40 border-b border-slate-800 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 rounded-full bg-blue-500" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Сырой поток данных</span>
+            <div className="p-3 bg-slate-800/40 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Поток данных</span>
               </div>
-              <div className="text-[10px] font-mono text-slate-400 bg-slate-950 px-3 py-1 rounded-full border border-slate-800">
+              <div className="text-[9px] font-mono text-slate-400 bg-slate-950 px-2 py-0.5 rounded-md border border-slate-800">
                 {logs.length} RECORDS
               </div>
             </div>
-            <div className="flex-1 p-6 font-mono text-[11px] leading-relaxed overflow-x-auto custom-scrollbar bg-slate-950/20">
+            <div className="flex-1 p-3 font-mono text-[10px] leading-tight overflow-x-auto custom-scrollbar bg-slate-950/20">
               {logs.length > 0 ? (
-                <table className="w-full border-separate border-spacing-y-1.5">
+                <table className="w-full border-separate border-spacing-y-0.5">
                   <tbody>
                     {logs.map((log, idx) => (
                       <tr key={idx} className="hover:bg-slate-800/40 transition-colors group">
-                        <td className="pr-6 py-1.5 text-slate-600 align-top whitespace-nowrap tabular-nums opacity-70 group-hover:opacity-100 transition-opacity">
+                        <td className="pr-3 py-0.5 text-slate-600 align-top whitespace-nowrap tabular-nums opacity-60 group-hover:opacity-100 transition-opacity">
                           {new Date(log.timestamp).toLocaleTimeString()}
-                          <span className="ml-2 opacity-30 text-[9px]">{new Date(log.timestamp).toLocaleDateString()}</span>
                         </td>
-                        <td className="pr-6 py-1.5 align-top">
-                          <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tighter ${
-                            log.level === 'error' ? 'text-red-400 bg-red-400/10 border border-red-500/20' :
-                            log.level === 'warn' ? 'text-amber-400 bg-amber-400/10 border border-amber-500/20' :
-                            'text-slate-500 bg-slate-800/50 border border-slate-700/30'
+                        <td className="pr-3 py-0.5 align-top">
+                          <span className={`px-1 py-0 rounded text-[8px] font-black uppercase tracking-tighter border ${
+                            log.level === 'error' ? 'text-red-400 bg-red-400/10 border-red-500/20' :
+                            log.level === 'warn' ? 'text-amber-400 bg-amber-400/10 border-amber-500/20' :
+                            'text-slate-500 bg-slate-800/50 border-slate-700/30'
                           }`}>
                             {log.level}
                           </span>
                         </td>
-                        <td className="py-1.5 text-slate-400 group-hover:text-slate-100 break-all transition-colors font-mono">
+                        <td className="py-0.5 text-slate-400 group-hover:text-slate-100 break-all transition-colors font-mono">
                           {log.line}
                         </td>
                       </tr>
@@ -396,12 +395,12 @@ const App: React.FC = () => {
                   </tbody>
                 </table>
               ) : (
-                <div className="h-full flex flex-col items-center justify-center text-slate-700 py-40 space-y-5">
+                <div className="h-full flex flex-col items-center justify-center text-slate-700 py-32 space-y-4">
                   <div className="relative">
-                    <Database size={56} className="opacity-10" />
-                    <Search className="absolute -bottom-2 -right-2 text-slate-800" size={24} />
+                    <Database size={48} className="opacity-10" />
+                    <Search className="absolute -bottom-1 -right-1 text-slate-800" size={20} />
                   </div>
-                  <p className="text-sm font-medium opacity-50">Данные не загружены. Уточните параметры и нажмите «Показать логи»</p>
+                  <p className="text-xs font-medium opacity-50">Данные не загружены.</p>
                 </div>
               )}
             </div>
@@ -409,12 +408,12 @@ const App: React.FC = () => {
         </section>
       </main>
 
-      <footer className="max-w-7xl mx-auto px-10 py-12 border-t border-slate-900 flex flex-col md:flex-row items-center justify-between gap-6 opacity-40 hover:opacity-100 transition-opacity">
+      <footer className="max-w-7xl mx-auto px-10 py-10 border-t border-slate-900 flex flex-col md:flex-row items-center justify-between gap-6 opacity-40 hover:opacity-100 transition-opacity">
         <div className="flex items-center gap-3">
-          <Activity size={18} />
-          <span className="font-bold text-xs uppercase tracking-[0.2em]">Loki AI Engine v2.1</span>
+          <Activity size={16} />
+          <span className="font-bold text-[10px] uppercase tracking-[0.2em]">Loki AI Engine v2.2</span>
         </div>
-        <p className="text-[10px] text-slate-500 font-medium">© 2024 Анализатор логов. Обработка: {config.aiProvider.toUpperCase()}.</p>
+        <p className="text-[9px] text-slate-500 font-medium">© 2024 Анализатор логов. Обработка: {config.aiProvider.toUpperCase()}.</p>
       </footer>
     </div>
   );
