@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Settings, Terminal, Activity, AlertCircle, CheckCircle2, RefreshCw, LayoutDashboard, Database, Sparkles, ShieldCheck, ShieldAlert, Save, Link, ChevronRight, Info } from 'lucide-react';
+import { Settings, Terminal, Activity, AlertCircle, CheckCircle2, RefreshCw, LayoutDashboard, Database, Sparkles, ShieldCheck, Link, ChevronRight, Info, XCircle, Check, X, Search, ListFilter } from 'lucide-react';
 import { LokiConfig, LogEntry, AnalysisResult, AppState } from './types';
 import { fetchLogs, testConnection } from './services/lokiService';
 import { analyzeLogsWithAI } from './services/geminiService';
@@ -11,7 +11,7 @@ const App: React.FC = () => {
 
   const [config, setConfig] = useState<LokiConfig>({
     url: defaultLokiUrl,
-    token: '',
+    token: '', // Keep in state for service compatibility, but remove from UI
     query: '{job="varlogs"}',
     limit: 100
   });
@@ -19,9 +19,10 @@ const App: React.FC = () => {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [state, setState] = useState<AppState>(AppState.IDLE);
+  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'logs' | 'config'>('config');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'logs'>('logs');
 
   const isAiReady = !!process.env.API_KEY && process.env.API_KEY !== 'undefined' && process.env.API_KEY !== '';
 
@@ -30,71 +31,83 @@ const App: React.FC = () => {
     if (savedConfig) {
       try {
         const parsed = JSON.parse(savedConfig);
-        // Если в сохраненных данных старый прокси-путь, меняем на наглядный URL
         if (parsed.url === '/loki-proxy') parsed.url = defaultLokiUrl;
-        setConfig(parsed);
+        setConfig(prev => ({ ...prev, ...parsed }));
       } catch (e) {
         console.error("Failed to parse saved config");
       }
     }
   }, [defaultLokiUrl]);
 
-  const clearMessages = () => {
-    setErrorMessage(null);
-    setSuccessMessage(null);
-  };
-
-  const handleTestConnection = async () => {
-    clearMessages();
-    setState(AppState.FETCHING);
+  const handleApplyConnection = async () => {
+    setConnectionStatus('testing');
     const isOk = await testConnection(config);
-    setState(AppState.IDLE);
+    
     if (isOk) {
-      setSuccessMessage("Связь с сервером Loki установлена!");
+      setConnectionStatus('success');
+      localStorage.setItem('loki_ai_config', JSON.stringify({ url: config.url }));
+      setTimeout(() => {
+        setConnectionStatus('idle');
+        setIsSettingsOpen(false);
+      }, 1200);
     } else {
-      setErrorMessage(`Не удалось подключиться к ${config.url}. Проверьте доступность сервера.`);
+      setConnectionStatus('error');
+      setTimeout(() => setConnectionStatus('idle'), 3000);
     }
   };
 
-  const handleSaveConfig = () => {
-    clearMessages();
-    localStorage.setItem('loki_ai_config', JSON.stringify(config));
-    setSuccessMessage("Настройки сохранены");
-    setTimeout(() => setSuccessMessage(null), 3000);
-  };
-
-  const handleRun = async () => {
+  const handleFetchOnly = async () => {
     try {
-      clearMessages();
+      setErrorMessage(null);
       setState(AppState.FETCHING);
       const fetchedLogs = await fetchLogs(config);
       setLogs(fetchedLogs);
+      setState(AppState.IDLE);
+      // Save query settings to local storage
+      localStorage.setItem('loki_ai_query_config', JSON.stringify({ query: config.query, limit: config.limit }));
+    } catch (err: any) {
+      console.error(err);
+      setState(AppState.ERROR);
+      setErrorMessage(err.message || "Ошибка получения логов.");
+    }
+  };
+
+  const handleAiAnalyze = async () => {
+    try {
+      setErrorMessage(null);
+      let currentLogs = logs;
       
-      if (fetchedLogs.length > 0) {
+      // If no logs, fetch them first
+      if (logs.length === 0) {
+        setState(AppState.FETCHING);
+        currentLogs = await fetchLogs(config);
+        setLogs(currentLogs);
+      }
+
+      if (currentLogs.length > 0) {
         if (isAiReady) {
           setState(AppState.ANALYZING);
-          const aiResult = await analyzeLogsWithAI(fetchedLogs);
+          const aiResult = await analyzeLogsWithAI(currentLogs);
           setAnalysis(aiResult);
           setState(AppState.IDLE);
           setActiveTab('dashboard');
         } else {
           setState(AppState.IDLE);
-          setActiveTab('logs');
-          setErrorMessage("Логи загружены, но AI анализ недоступен без ключа API.");
+          setErrorMessage("AI анализ недоступен без ключа API.");
         }
       } else {
         setState(AppState.IDLE);
-        setErrorMessage("Логи не найдены. Проверьте запрос LogQL.");
+        setErrorMessage("Логи не найдены для анализа.");
       }
     } catch (err: any) {
       console.error(err);
       setState(AppState.ERROR);
-      setErrorMessage(err.message || "Ошибка подключения.");
+      setErrorMessage(err.message || "Ошибка анализа.");
     }
   };
 
   return (
-    <div className="flex h-screen bg-slate-950 text-slate-200 overflow-hidden font-sans selection:bg-blue-500/30">
+    <div className="flex h-screen bg-slate-950 text-slate-200 overflow-hidden font-sans selection:bg-blue-500/30 text-sm">
       {/* Sidebar */}
       <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col hidden lg:flex">
         <div className="p-6 border-b border-slate-800 flex items-center gap-3">
@@ -106,7 +119,6 @@ const App: React.FC = () => {
 
         <nav className="flex-1 p-4 space-y-1.5">
           {[
-            { id: 'config', label: 'Подключение', icon: Settings },
             { id: 'logs', label: 'Просмотр логов', icon: Terminal },
             { id: 'dashboard', label: 'Аналитика AI', icon: LayoutDashboard, disabled: !isAiReady && !analysis },
           ].map((item) => (
@@ -130,12 +142,12 @@ const App: React.FC = () => {
         <div className="p-4 border-t border-slate-800">
            <div className="p-4 bg-slate-950/50 rounded-2xl border border-slate-800/50 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Статус системы</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-blue-500/80">Сервис</span>
                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               </div>
               <div className="space-y-1">
-                <p className="text-[11px] text-slate-400 flex items-center gap-1.5">
-                  <Database size={12} /> {config.url.replace(/^https?:\/\//, '')}
+                <p className="text-[11px] text-slate-400 flex items-center gap-1.5 truncate">
+                  <Database size={12} className="shrink-0" /> {config.url.replace(/^https?:\/\//, '')}
                 </p>
                 <p className="text-[11px] text-slate-400 flex items-center gap-1.5">
                   <ShieldCheck size={12} className={isAiReady ? 'text-emerald-500' : 'text-slate-600'} /> AI: {isAiReady ? 'Активен' : 'Выключен'}
@@ -145,154 +157,179 @@ const App: React.FC = () => {
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-16 bg-slate-900/50 border-b border-slate-800 px-8 flex items-center justify-between backdrop-blur-md z-10">
+      <main className="flex-1 flex flex-col overflow-hidden relative">
+        {/* Settings Modal (Connection Only) */}
+        {isSettingsOpen && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center p-6">
+            <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm animate-in fade-in" onClick={() => setIsSettingsOpen(false)} />
+            <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl shadow-2xl relative z-10 animate-in zoom-in-95 duration-200">
+              <div className="p-6 border-b border-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-600/10 rounded-lg">
+                    <Settings size={20} className="text-blue-500" />
+                  </div>
+                  <h3 className="text-lg font-bold text-white">Хост Loki</h3>
+                </div>
+                <button onClick={() => setIsSettingsOpen(false)} className="p-2 text-slate-500 hover:text-white hover:bg-slate-800 rounded-xl transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <div className="p-8 space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Loki URL</label>
+                  <div className="relative">
+                    <Database className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" size={16} />
+                    <input
+                      type="text"
+                      value={config.url}
+                      onChange={(e) => setConfig({ ...config, url: e.target.value })}
+                      placeholder="http://192.168.20.96:3100"
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500/50 rounded-xl pl-11 pr-4 py-3 focus:outline-none focus:ring-4 focus:ring-blue-500/5 transition-all font-mono text-sm text-blue-400"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 px-1">
+                     <Info size={12} className="text-slate-600 shrink-0" />
+                     <p className="text-[10px] text-slate-500 italic">Настройки проксирования заданы в Docker-контейнере</p>
+                  </div>
+                </div>
+
+                <div className="pt-4">
+                   <button 
+                    onClick={handleApplyConnection}
+                    disabled={connectionStatus === 'testing'}
+                    className={`w-full px-6 py-4 rounded-xl font-bold transition-all flex items-center justify-center gap-3 active:scale-[0.98] shadow-lg ${
+                      connectionStatus === 'testing' ? 'bg-slate-800 text-slate-400 cursor-not-allowed' :
+                      connectionStatus === 'success' ? 'bg-emerald-600 text-white shadow-emerald-500/20' :
+                      connectionStatus === 'error' ? 'bg-red-600 text-white shadow-red-500/20' :
+                      'bg-blue-600 text-white hover:bg-blue-500'
+                    }`}
+                   >
+                     {connectionStatus === 'testing' ? (
+                       <RefreshCw size={18} className="animate-spin" />
+                     ) : connectionStatus === 'success' ? (
+                       <Check size={18} />
+                     ) : connectionStatus === 'error' ? (
+                       <XCircle size={18} />
+                     ) : (
+                       <Link size={18} />
+                     )}
+                     
+                     {connectionStatus === 'testing' ? 'Проверка...' : 
+                      connectionStatus === 'success' ? 'Связь установлена' : 
+                      connectionStatus === 'error' ? 'Ошибка связи' : 
+                      'Применить хост'}
+                   </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <header className="h-16 bg-slate-900/50 border-b border-slate-800 px-8 flex items-center justify-between backdrop-blur-md z-10 shrink-0">
           <div className="flex items-center gap-3 text-sm">
             <span className="text-slate-500">Система</span>
             <ChevronRight size={14} className="text-slate-700" />
-            <span className="font-bold text-slate-100">{activeTab === 'config' ? 'Настройки подключения' : activeTab === 'logs' ? 'Журнал событий' : 'AI Дашборд'}</span>
+            <span className="font-bold text-slate-100">{activeTab === 'logs' ? 'Журнал событий' : 'AI Дашборд'}</span>
           </div>
 
-          <button 
-            onClick={handleRun}
-            disabled={state === AppState.FETCHING || state === AppState.ANALYZING}
-            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all shadow-lg ${
-              state === AppState.FETCHING || state === AppState.ANALYZING
-                ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-500/25 active:scale-95'
-            }`}
-          >
-            {state === AppState.FETCHING || state === AppState.ANALYZING ? (
-              <RefreshCw size={16} className="animate-spin" />
-            ) : (
-              <Sparkles size={16} />
-            )}
-            {state === AppState.FETCHING ? 'Загрузка данных...' : state === AppState.ANALYZING ? 'Анализ AI...' : 'Запустить анализ'}
-          </button>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setIsSettingsOpen(true)}
+              className="p-2.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all border border-transparent hover:border-slate-700 group active:scale-95"
+              title="Настройки хоста Loki"
+            >
+              <Settings size={20} className="group-hover:rotate-45 transition-transform duration-500" />
+            </button>
+
+            <button 
+              onClick={handleAiAnalyze}
+              disabled={state === AppState.FETCHING || state === AppState.ANALYZING}
+              className={`flex items-center gap-2 px-5 py-2 rounded-xl font-bold text-sm transition-all shadow-lg ${
+                state === AppState.FETCHING || state === AppState.ANALYZING
+                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                  : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-500/25 active:scale-95'
+              }`}
+            >
+              {state === AppState.ANALYZING ? (
+                <RefreshCw size={16} className="animate-spin" />
+              ) : (
+                <Sparkles size={16} />
+              )}
+              {state === AppState.ANALYZING ? 'Анализ...' : 'Анализировать AI'}
+            </button>
+          </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-6 md:p-10 bg-[#020617] custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-[#020617] custom-scrollbar">
           {errorMessage && (
-            <div className="mb-8 p-4 bg-red-500/5 border border-red-500/20 rounded-2xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
-              <AlertCircle className="text-red-500 mt-0.5 shrink-0" size={20} />
-              <p className="text-red-400 text-sm font-medium">{errorMessage}</p>
-            </div>
-          )}
-
-          {successMessage && (
-            <div className="mb-8 p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
-              <CheckCircle2 className="text-emerald-500 mt-0.5 shrink-0" size={20} />
-              <p className="text-emerald-400 text-sm font-medium">{successMessage}</p>
-            </div>
-          )}
-
-          {activeTab === 'config' && (
-            <div className="max-w-4xl mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="space-y-3">
-                <h2 className="text-4xl font-black text-white tracking-tight">Сервер Loki</h2>
-                <p className="text-slate-400 text-lg">Укажите адрес вашего инстанса для получения логов.</p>
-              </div>
-              
-              <div className="bg-slate-900/50 rounded-3xl p-8 md:p-10 border border-slate-800 shadow-2xl space-y-8 relative overflow-hidden">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                  <div className="space-y-6">
-                    <div className="space-y-2.5">
-                      <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Адрес сервера Loki</label>
-                      <div className="relative">
-                         <Database className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" size={18} />
-                         <input
-                          type="text"
-                          value={config.url}
-                          onChange={(e) => setConfig({ ...config, url: e.target.value })}
-                          placeholder="http://192.168.20.96:3100"
-                          className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500/50 rounded-2xl pl-12 pr-4 py-4 focus:outline-none focus:ring-4 focus:ring-blue-500/5 transition-all font-mono text-sm text-blue-400"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2 px-1">
-                         <Info size={12} className="text-slate-600" />
-                         <p className="text-[10px] text-slate-500 italic">Браузерные запросы будут автоматически проксироваться через Docker</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2.5">
-                      <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Токен авторизации</label>
-                      <input
-                        type="password"
-                        value={config.token}
-                        onChange={(e) => setConfig({ ...config, token: e.target.value })}
-                        placeholder="Bearer или API Key (необязательно)"
-                        className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500/50 rounded-2xl px-4 py-4 focus:outline-none focus:ring-4 focus:ring-blue-500/5 transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-6">
-                    <div className="space-y-2.5">
-                      <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">LogQL Запрос</label>
-                      <input
-                        type="text"
-                        value={config.query}
-                        onChange={(e) => setConfig({ ...config, query: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500/50 rounded-2xl px-4 py-4 focus:outline-none focus:ring-4 focus:ring-blue-500/5 transition-all font-mono text-sm"
-                      />
-                    </div>
-
-                    <div className="space-y-2.5">
-                      <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Лимит строк</label>
-                      <input
-                        type="number"
-                        value={config.limit}
-                        onChange={(e) => setConfig({ ...config, limit: parseInt(e.target.value) || 100 })}
-                        className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500/50 rounded-2xl px-4 py-4 focus:outline-none focus:ring-4 focus:ring-blue-500/5 transition-all"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-8 border-t border-slate-800 flex flex-col sm:flex-row gap-4">
-                   <button 
-                    onClick={handleTestConnection}
-                    disabled={state === AppState.FETCHING}
-                    className="flex-1 bg-slate-800 hover:bg-slate-700 text-white px-6 py-4 rounded-2xl font-bold border border-slate-700 transition-all flex items-center justify-center gap-3 active:scale-95"
-                   >
-                     {state === AppState.FETCHING ? <RefreshCw size={18} className="animate-spin" /> : <Link size={18} className="text-slate-400" />}
-                     Проверить связь
-                   </button>
-                   <button 
-                    onClick={handleSaveConfig}
-                    className="flex-1 bg-blue-600 hover:bg-blue-500 text-white px-6 py-4 rounded-2xl font-bold shadow-xl shadow-blue-500/20 transition-all flex items-center justify-center gap-3 active:scale-95"
-                   >
-                     <Save size={18} />
-                     Сохранить настройки
-                   </button>
-                </div>
-              </div>
+            <div className="max-w-6xl mx-auto mb-6 p-4 bg-red-500/5 border border-red-500/20 rounded-2xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
+              <AlertCircle className="text-red-500 mt-0.5 shrink-0" size={18} />
+              <p className="text-red-400 text-xs font-medium">{errorMessage}</p>
             </div>
           )}
 
           {activeTab === 'logs' && (
-            <div className="animate-in fade-in duration-500 h-full flex flex-col">
-               <div className="bg-slate-900 rounded-3xl border border-slate-800 overflow-hidden shadow-2xl flex-1 flex flex-col min-h-[500px]">
-                 <div className="p-5 bg-slate-800/40 border-b border-slate-800 flex items-center justify-between">
+            <div className="animate-in fade-in duration-500 h-full flex flex-col space-y-6">
+               {/* Log Filters Panel */}
+               <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row gap-4 items-end">
+                  <div className="flex-1 space-y-1.5 w-full">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">LogQL Query</label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={14} />
+                      <input 
+                        type="text"
+                        value={config.query}
+                        onChange={(e) => setConfig({...config, query: e.target.value})}
+                        className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500/50 rounded-xl pl-9 pr-4 py-2.5 focus:outline-none transition-all font-mono text-xs text-slate-300"
+                        placeholder='{job="varlogs"}'
+                      />
+                    </div>
+                  </div>
+                  <div className="w-full md:w-32 space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Лимит</label>
+                    <div className="relative">
+                      <ListFilter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={14} />
+                      <input 
+                        type="number"
+                        value={config.limit}
+                        onChange={(e) => setConfig({...config, limit: parseInt(e.target.value) || 100})}
+                        className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500/50 rounded-xl pl-9 pr-3 py-2.5 focus:outline-none transition-all text-xs"
+                      />
+                    </div>
+                  </div>
+                  <button 
+                    onClick={handleFetchOnly}
+                    disabled={state === AppState.FETCHING}
+                    className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 border border-slate-700 active:scale-95 disabled:opacity-50 h-[42px]"
+                  >
+                    {state === AppState.FETCHING ? <RefreshCw size={16} className="animate-spin" /> : <Terminal size={16} />}
+                    Показать
+                  </button>
+               </div>
+
+               {/* Logs Table */}
+               <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl flex-1 flex flex-col min-h-[400px]">
+                 <div className="p-4 bg-slate-800/40 border-b border-slate-800 flex items-center justify-between">
                    <div className="flex items-center gap-3">
-                     <div className="w-2 h-2 rounded-full bg-blue-500" />
-                     <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Сырой поток логов</span>
+                     <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                     <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Поток данных</span>
                    </div>
-                   <div className="text-[10px] font-mono text-slate-500 bg-slate-950 px-2 py-1 rounded">
-                     {logs.length} ЗАПИСЕЙ
+                   <div className="text-[9px] font-mono text-slate-500 bg-slate-950 px-2 py-1 rounded">
+                     {logs.length} RECORDS
                    </div>
                  </div>
-                 <div className="flex-1 overflow-auto p-6 font-mono text-[11px] leading-relaxed custom-scrollbar bg-slate-950/40">
+                 <div className="flex-1 overflow-auto p-4 font-mono text-[11px] leading-relaxed custom-scrollbar bg-slate-950/40">
                    {logs.length > 0 ? (
                      <table className="w-full border-separate border-spacing-y-1">
                        <tbody>
                          {logs.map((log, idx) => (
                            <tr key={idx} className="hover:bg-slate-800/30 transition-colors group">
-                             <td className="pr-6 py-1 text-slate-600 align-top whitespace-nowrap tabular-nums">
+                             <td className="pr-6 py-1 text-slate-600 align-top whitespace-nowrap tabular-nums opacity-60">
                                {new Date(log.timestamp).toLocaleTimeString()}
                              </td>
                              <td className="pr-4 py-1 align-top">
-                               <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter ${
+                               <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter ${
                                  log.level === 'error' ? 'text-red-400 bg-red-400/10' :
                                  log.level === 'warn' ? 'text-amber-400 bg-amber-400/10' :
                                  'text-slate-500 bg-slate-800/50'
@@ -300,7 +337,7 @@ const App: React.FC = () => {
                                  {log.level}
                                </span>
                              </td>
-                             <td className="py-1 text-slate-400 group-hover:text-slate-200 break-all transition-colors">
+                             <td className="py-1 text-slate-400 group-hover:text-slate-200 break-all transition-colors font-mono">
                                {log.line}
                              </td>
                            </tr>
@@ -309,8 +346,8 @@ const App: React.FC = () => {
                      </table>
                    ) : (
                      <div className="h-full flex flex-col items-center justify-center text-slate-700 py-32 space-y-4">
-                       <Database size={48} className="opacity-10" />
-                       <p className="text-sm font-medium">Нет данных для отображения. Запустите анализ.</p>
+                       <Database size={40} className="opacity-10" />
+                       <p className="text-xs font-medium">Очередь пуста. Введите запрос и нажмите «Показать»</p>
                      </div>
                    )}
                  </div>
@@ -325,12 +362,12 @@ const App: React.FC = () => {
           {activeTab === 'dashboard' && !analysis && (
              <div className="h-full flex flex-col items-center justify-center py-32 space-y-8">
                 <div className="relative">
-                  <div className="absolute inset-0 bg-blue-600 blur-[80px] opacity-20 animate-pulse" />
-                  <Sparkles size={80} className="text-slate-800 relative z-10" />
+                  <div className="absolute inset-0 bg-blue-600 blur-[80px] opacity-10 animate-pulse" />
+                  <Sparkles size={64} className="text-slate-800 relative z-10" />
                 </div>
                 <div className="text-center space-y-2">
-                  <h3 className="text-2xl font-bold text-slate-300">Готов к анализу</h3>
-                  <p className="text-slate-500 max-w-sm">Нажмите кнопку запуска сверху, чтобы Gemini AI построил отчет по вашим логам.</p>
+                  <h3 className="text-xl font-bold text-slate-400">Нет данных анализа</h3>
+                  <p className="text-slate-600 text-xs max-w-xs mx-auto">Нажмите «Анализировать AI» в шапке, чтобы получить отчет.</p>
                 </div>
              </div>
           )}
