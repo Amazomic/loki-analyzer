@@ -1,6 +1,42 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { LogEntry, AnalysisResult, LokiConfig } from "../types";
+import { LogEntry, AnalysisResult, LokiConfig, AIProvider } from "../types";
+
+export const fetchAvailableModels = async (provider: AIProvider, apiKey?: string) => {
+  try {
+    if (provider === 'openrouter') {
+      const res = await fetch('https://openrouter.ai/api/v1/models');
+      if (!res.ok) throw new Error('Ошибка при получении моделей OpenRouter');
+      const data = await res.json();
+      // Возвращаем список моделей, сортируя по популярности/названию если нужно
+      return data.data.map((m: any) => ({ id: m.id, name: m.name || m.id }));
+    }
+    
+    if (provider === 'openai' && apiKey) {
+      const res = await fetch('https://api.openai.com/v1/models', {
+        headers: { 'Authorization': `Bearer ${apiKey}` }
+      });
+      if (!res.ok) throw new Error('Ошибка при получении моделей OpenAI');
+      const data = await res.json();
+      return data.data
+        .filter((m: any) => m.id.startsWith('gpt'))
+        .map((m: any) => ({ id: m.id, name: m.id }));
+    }
+    
+    if (provider === 'gemini') {
+      return [
+        { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash' },
+        { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro' },
+        { id: 'gemini-2.5-flash-lite-latest', name: 'Gemini 2.5 Flash Lite' }
+      ];
+    }
+    
+    return [];
+  } catch (error) {
+    console.error('Failed to fetch models:', error);
+    return [];
+  }
+};
 
 export const analyzeLogsWithAI = async (logs: LogEntry[], config: LokiConfig): Promise<AnalysisResult> => {
   const logContent = logs.slice(0, 50).map(l => `[${l.timestamp}] [${l.level.toUpperCase()}] ${l.line}`).join('\n');
@@ -83,7 +119,7 @@ export const analyzeLogsWithAI = async (logs: LogEntry[], config: LokiConfig): P
       method: 'POST',
       headers,
       body: JSON.stringify({
-        model: config.aiModel || (config.aiProvider === 'openai' ? 'gpt-4o-mini' : 'google/gemini-2.0-flash-lite:preview'),
+        model: config.aiModel,
         messages: [{ role: 'user', content: prompt }],
         response_format: { type: "json_object" }
       })

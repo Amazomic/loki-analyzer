@@ -1,9 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
-import { Settings, Terminal, Activity, AlertCircle, RefreshCw, Database, Sparkles, ShieldCheck, Link, ChevronRight, Info, XCircle, Check, X, Search, ListFilter, Clock, LayoutDashboard, Key, Cpu } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Settings, Terminal, Activity, AlertCircle, RefreshCw, Database, Sparkles, ShieldCheck, Link, ChevronRight, Info, XCircle, Check, X, Search, ListFilter, Clock, LayoutDashboard, Key, Cpu, RefreshCcw } from 'lucide-react';
 import { LokiConfig, LogEntry, AnalysisResult, AppState, AIProvider } from './types';
 import { fetchLogs, testConnection } from './services/lokiService';
-import { analyzeLogsWithAI } from './services/aiService';
+import { analyzeLogsWithAI, fetchAvailableModels } from './services/aiService';
 import Dashboard from './components/Dashboard';
 
 const App: React.FC = () => {
@@ -26,10 +26,13 @@ const App: React.FC = () => {
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  
+  const [availableModels, setAvailableModels] = useState<{id: string, name: string}[]>([]);
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
 
   const isSystemAiReady = !!process.env.API_KEY && process.env.API_KEY !== 'undefined' && process.env.API_KEY !== '';
   const isUserAiReady = config.aiKey.length > 0;
-  const canAnalyze = isSystemAiReady || isUserAiReady;
+  const canAnalyze = isSystemAiReady || isUserAiReady || config.aiProvider === 'openrouter';
 
   useEffect(() => {
     const savedConfig = localStorage.getItem('loki_ai_full_config');
@@ -40,6 +43,24 @@ const App: React.FC = () => {
       } catch (e) { console.error("Config load error"); }
     }
   }, []);
+
+  const loadModels = useCallback(async (provider: AIProvider, key: string) => {
+    setIsLoadingModels(true);
+    const models = await fetchAvailableModels(provider, key);
+    setAvailableModels(models);
+    setIsLoadingModels(false);
+    
+    // Если текущая модель не в списке, выбираем первую доступную
+    if (models.length > 0 && !models.find(m => m.id === config.aiModel)) {
+      setConfig(prev => ({ ...prev, aiModel: models[0].id }));
+    }
+  }, [config.aiModel]);
+
+  useEffect(() => {
+    if (isSettingsOpen) {
+      loadModels(config.aiProvider, config.aiKey);
+    }
+  }, [isSettingsOpen, config.aiProvider, config.aiKey, loadModels]);
 
   const saveToStorage = (newConfig: LokiConfig) => {
     const { query, limit, range, ...settings } = newConfig;
@@ -147,7 +168,7 @@ const App: React.FC = () => {
                   {(['gemini', 'openai', 'openrouter'] as AIProvider[]).map(p => (
                     <button
                       key={p}
-                      onClick={() => setConfig({...config, aiProvider: p, aiModel: p === 'gemini' ? 'gemini-3-flash-preview' : p === 'openai' ? 'gpt-4o-mini' : 'google/gemini-2.5-flash-lite:free'})}
+                      onClick={() => setConfig({...config, aiProvider: p})}
                       className={`py-2 px-3 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition-all ${
                         config.aiProvider === p 
                         ? 'bg-blue-600/20 border-blue-500 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.1)]' 
@@ -159,19 +180,7 @@ const App: React.FC = () => {
                   ))}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Модель</label>
-                    <div className="relative">
-                      <Cpu className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" size={16} />
-                      <input
-                        type="text"
-                        value={config.aiModel}
-                        onChange={(e) => setConfig({ ...config, aiModel: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500/50 rounded-xl pl-11 pr-4 py-3 focus:outline-none transition-all text-xs"
-                      />
-                    </div>
-                  </div>
+                <div className="space-y-4">
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">API Ключ</label>
                     <div className="relative">
@@ -183,6 +192,30 @@ const App: React.FC = () => {
                         placeholder={config.aiProvider === 'gemini' && isSystemAiReady ? "Используется системный ключ" : "Введите ваш ключ"}
                         className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500/50 rounded-xl pl-11 pr-4 py-3 focus:outline-none transition-all text-xs"
                       />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between ml-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Модель</label>
+                      {isLoadingModels && <RefreshCcw size={12} className="animate-spin text-blue-500" />}
+                    </div>
+                    <div className="relative">
+                      <Cpu className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" size={16} />
+                      <select
+                        value={config.aiModel}
+                        onChange={(e) => setConfig({ ...config, aiModel: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500/50 rounded-xl pl-11 pr-4 py-3 focus:outline-none transition-all text-xs appearance-none cursor-pointer"
+                      >
+                        {availableModels.length > 0 ? (
+                          availableModels.map(m => (
+                            <option key={m.id} value={m.id}>{m.name}</option>
+                          ))
+                        ) : (
+                          <option value={config.aiModel}>{config.aiModel || 'Загрузка...'}</option>
+                        )}
+                      </select>
+                      <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600 rotate-90" size={14} />
                     </div>
                   </div>
                 </div>
@@ -233,7 +266,7 @@ const App: React.FC = () => {
               </div>
               <div className={`flex items-center gap-2 text-[11px] font-medium px-3 py-1.5 rounded-lg border ${canAnalyze ? 'bg-purple-500/5 border-purple-500/20 text-purple-400' : 'bg-slate-950 border-slate-800 text-slate-500'}`}>
                  <ShieldCheck size={13} />
-                 <span className="uppercase">{config.aiProvider}: {config.aiModel}</span>
+                 <span className="uppercase max-w-[200px] truncate">{config.aiProvider}: {config.aiModel}</span>
               </div>
             </div>
           </div>
@@ -411,7 +444,7 @@ const App: React.FC = () => {
       <footer className="max-w-7xl mx-auto px-10 py-10 border-t border-slate-900 flex flex-col md:flex-row items-center justify-between gap-6 opacity-40 hover:opacity-100 transition-opacity">
         <div className="flex items-center gap-3">
           <Activity size={16} />
-          <span className="font-bold text-[10px] uppercase tracking-[0.2em]">Loki AI Engine v2.2</span>
+          <span className="font-bold text-[10px] uppercase tracking-[0.2em]">Loki AI Engine v2.3</span>
         </div>
         <p className="text-[9px] text-slate-500 font-medium">© 2024 Анализатор логов. Обработка: {config.aiProvider.toUpperCase()}.</p>
       </footer>
