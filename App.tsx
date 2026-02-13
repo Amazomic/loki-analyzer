@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Settings, Search, Terminal, Activity, AlertCircle, CheckCircle2, RefreshCw, BarChart3, LayoutDashboard, Database, HelpCircle } from 'lucide-react';
+import { Settings, Search, Terminal, Activity, AlertCircle, CheckCircle2, RefreshCw, LayoutDashboard, Database, HelpCircle, Sparkles, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { LokiConfig, LogEntry, AnalysisResult, AppState } from './types';
 import { fetchLogs } from './services/lokiService';
 import { analyzeLogsWithAI } from './services/geminiService';
@@ -20,6 +20,8 @@ const App: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'logs' | 'config'>('config');
 
+  const isAiReady = !!process.env.API_KEY && process.env.API_KEY !== 'undefined' && process.env.API_KEY !== '';
+
   const handleRun = async () => {
     try {
       setErrorMessage(null);
@@ -28,11 +30,17 @@ const App: React.FC = () => {
       setLogs(fetchedLogs);
       
       if (fetchedLogs.length > 0) {
-        setState(AppState.ANALYZING);
-        const aiResult = await analyzeLogsWithAI(fetchedLogs);
-        setAnalysis(aiResult);
-        setState(AppState.IDLE);
-        setActiveTab('dashboard');
+        if (isAiReady) {
+          setState(AppState.ANALYZING);
+          const aiResult = await analyzeLogsWithAI(fetchedLogs);
+          setAnalysis(aiResult);
+          setState(AppState.IDLE);
+          setActiveTab('dashboard');
+        } else {
+          setState(AppState.IDLE);
+          setActiveTab('logs');
+          setErrorMessage("Logs fetched successfully, but AI Analysis is unavailable because the Gemini API Key is missing in the environment.");
+        }
       } else {
         setState(AppState.IDLE);
         setErrorMessage("No logs found matching the filter.");
@@ -47,7 +55,7 @@ const App: React.FC = () => {
   const navItems = [
     { id: 'config', label: 'Setup', icon: Settings },
     { id: 'logs', label: 'Log Explorer', icon: Terminal },
-    { id: 'dashboard', label: 'AI Analysis', icon: LayoutDashboard },
+    { id: 'dashboard', label: 'AI Analysis', icon: LayoutDashboard, disabled: !isAiReady && !analysis },
   ];
 
   return (
@@ -66,7 +74,9 @@ const App: React.FC = () => {
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id as any)}
+              disabled={item.disabled}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+                item.disabled ? 'opacity-30 cursor-not-allowed' :
                 activeTab === item.id 
                   ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20' 
                   : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
@@ -78,7 +88,7 @@ const App: React.FC = () => {
           ))}
         </nav>
 
-        <div className="p-4 border-t border-slate-800">
+        <div className="p-4 border-t border-slate-800 space-y-4">
           <div className="p-4 bg-slate-800/50 rounded-xl space-y-3">
             <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">
               <Database size={12} />
@@ -88,6 +98,16 @@ const App: React.FC = () => {
               <div className={`w-2 h-2 rounded-full ${state === AppState.ERROR ? 'bg-red-500' : 'bg-green-500'}`} />
               <span className="text-sm font-medium">{state === AppState.ERROR ? 'Connection Error' : 'Ready'}</span>
             </div>
+          </div>
+
+          <div className={`p-4 rounded-xl border ${isAiReady ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-amber-500/5 border-amber-500/20'} space-y-2`}>
+             <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">AI Engine</span>
+                {isAiReady ? <ShieldCheck size={14} className="text-emerald-500" /> : <ShieldAlert size={14} className="text-amber-500" />}
+             </div>
+             <p className={`text-xs font-medium ${isAiReady ? 'text-emerald-400' : 'text-amber-400'}`}>
+                {isAiReady ? 'Gemini Pro Active' : 'API Key Missing'}
+             </p>
           </div>
         </div>
       </aside>
@@ -115,9 +135,9 @@ const App: React.FC = () => {
               {state === AppState.FETCHING || state === AppState.ANALYZING ? (
                 <RefreshCw size={16} className="animate-spin" />
               ) : (
-                <Search size={16} />
+                <Sparkles size={16} />
               )}
-              {state === AppState.FETCHING ? 'Fetching...' : state === AppState.ANALYZING ? 'Analyzing...' : 'Analyze Logs'}
+              {state === AppState.FETCHING ? 'Fetching...' : state === AppState.ANALYZING ? 'Analyzing...' : 'Fetch & Analyze'}
             </button>
           </div>
         </header>
@@ -128,7 +148,7 @@ const App: React.FC = () => {
             <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-start gap-3">
               <AlertCircle className="text-red-500 mt-0.5 shrink-0" size={18} />
               <div>
-                <h4 className="font-bold text-red-500 text-sm">Operation Failed</h4>
+                <h4 className="font-bold text-red-500 text-sm">Action Required</h4>
                 <p className="text-red-400 text-sm mt-1">{errorMessage}</p>
               </div>
             </div>
@@ -138,30 +158,31 @@ const App: React.FC = () => {
             <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="space-y-2">
                 <h2 className="text-3xl font-bold text-white">Loki Configuration</h2>
-                <p className="text-slate-400">Connect your Grafana Loki instance to start monitoring.</p>
+                <p className="text-slate-400">Configure your Grafana Loki source. AI analysis is automatically handled via the environment API key.</p>
               </div>
               
               <div className="bg-slate-900 rounded-2xl p-8 border border-slate-800 space-y-6 shadow-xl">
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-300">Loki Endpoint</label>
+                  <label className="text-sm font-semibold text-slate-300">Loki URL</label>
                   <input
                     type="text"
                     value={config.url}
                     onChange={(e) => setConfig({ ...config, url: e.target.value })}
-                    placeholder="https://logs.example.com"
+                    placeholder="http://loki:3100"
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all placeholder:text-slate-600"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-300">API Token / Basic Auth</label>
+                  <label className="text-sm font-semibold text-slate-300">Loki Auth Token (Optional)</label>
                   <input
                     type="password"
                     value={config.token}
                     onChange={(e) => setConfig({ ...config, token: e.target.value })}
-                    placeholder="Enter your bearer token or auth header"
+                    placeholder="Bearer token or Basic Auth header"
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all placeholder:text-slate-600"
                   />
+                  <p className="text-[10px] text-slate-500 italic">This is for authenticating with your Loki server, not for the AI.</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-6">
@@ -171,7 +192,7 @@ const App: React.FC = () => {
                       type="text"
                       value={config.query}
                       onChange={(e) => setConfig({ ...config, query: e.target.value })}
-                      placeholder='{app="api"}'
+                      placeholder='{job="varlogs"}'
                       className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all font-mono text-sm"
                     />
                   </div>
@@ -186,12 +207,25 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="pt-4 flex justify-end">
+                <div className="pt-4 flex justify-between items-center">
+                   <div className="flex items-center gap-2">
+                     {isAiReady ? (
+                       <div className="flex items-center gap-1.5 text-xs text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+                         <CheckCircle2 size={12} />
+                         AI Analysis Ready
+                       </div>
+                     ) : (
+                       <div className="flex items-center gap-1.5 text-xs text-amber-500 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
+                         <AlertCircle size={12} />
+                         AI Analysis Unavailable (No Key)
+                       </div>
+                     )}
+                   </div>
                    <button 
                     onClick={handleRun}
                     className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2"
                    >
-                     Test Connection & Analyze
+                     Fetch Logs {isAiReady && '& Analyze'}
                    </button>
                 </div>
               </div>
@@ -199,10 +233,8 @@ const App: React.FC = () => {
               <div className="bg-blue-900/10 border border-blue-500/20 rounded-2xl p-6 flex items-start gap-4">
                 <HelpCircle className="text-blue-400 mt-1 shrink-0" />
                 <div className="text-sm text-blue-200/80 leading-relaxed">
-                  <p className="font-semibold text-blue-300 mb-1">How it works</p>
-                  1. We fetch logs using LogQL from your Loki instance.<br/>
-                  2. We filter for common error patterns and stack traces.<br/>
-                  3. Gemini AI analyzes the context and provides specific recommendations.
+                  <p className="font-semibold text-blue-300 mb-1">Environment Configuration</p>
+                  LokiEye AI is designed to run in a controlled environment. The Gemini API key is managed via <code className="bg-slate-800 px-1 rounded text-blue-300">GEMINI_API_KEY</code> in your docker-compose or .env file. You only need to provide Loki access details here.
                 </div>
               </div>
             </div>
@@ -214,10 +246,10 @@ const App: React.FC = () => {
                  <div className="p-4 bg-slate-800/50 border-b border-slate-800 flex items-center justify-between">
                    <div className="flex items-center gap-2">
                      <Terminal size={16} className="text-slate-400" />
-                     <span className="text-sm font-bold uppercase tracking-widest text-slate-400">Raw Logs</span>
+                     <span className="text-sm font-bold uppercase tracking-widest text-slate-400">Log Stream</span>
                    </div>
                    <div className="text-xs text-slate-500 font-mono">
-                     Showing {logs.length} entries
+                     {logs.length} entries fetched
                    </div>
                  </div>
                  <div className="p-6 font-mono text-xs leading-relaxed overflow-x-auto h-[70vh] custom-scrollbar">
@@ -249,7 +281,7 @@ const App: React.FC = () => {
                    ) : (
                      <div className="h-full flex flex-col items-center justify-center text-slate-600 gap-4">
                        <Terminal size={48} />
-                       <p className="text-lg">No logs loaded. Click 'Analyze Logs' to fetch data.</p>
+                       <p className="text-lg">No logs loaded. Configure the source and click 'Fetch'.</p>
                      </div>
                    )}
                  </div>
@@ -262,9 +294,14 @@ const App: React.FC = () => {
           )}
 
           {activeTab === 'dashboard' && !analysis && state === AppState.IDLE && (
-            <div className="h-full flex flex-col items-center justify-center text-slate-500 animate-pulse">
-               <Activity size={64} strokeWidth={1} />
-               <p className="mt-6 text-xl">Run an analysis to see insights here.</p>
+            <div className="h-full flex flex-col items-center justify-center text-slate-500 text-center space-y-4">
+               <div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center border border-slate-800 animate-pulse">
+                 <Sparkles size={32} strokeWidth={1.5} className="text-slate-600" />
+               </div>
+               <div>
+                 <p className="text-xl font-medium">No Analysis Result Yet</p>
+                 <p className="text-slate-600 max-w-sm mx-auto mt-2">Connect to Loki and run the analyzer to see AI-generated insights and recommendations.</p>
+               </div>
             </div>
           )}
         </div>
