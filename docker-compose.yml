@@ -1,9 +1,8 @@
-
-version: '3.8'
-
 services:
   log-analyzer:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.yml
     ports:
       - "8080:80"
     environment:
