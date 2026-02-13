@@ -11,4 +11,5 @@ services:
       - "${APP_PORT:-8080}:80"
     environment:
       - API_KEY=${GEMINI_API_KEY}
+      - LOKI_BACKEND_URL=${LOKI_URL:-http://192.168.20.96:3100}
     restart: always

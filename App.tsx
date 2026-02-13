@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Settings, Search, Terminal, Activity, AlertCircle, CheckCircle2, RefreshCw, LayoutDashboard, Database, HelpCircle, Sparkles, ShieldCheck, ShieldAlert, Save, Link } from 'lucide-react';
+import { Settings, Search, Terminal, Activity, AlertCircle, CheckCircle2, RefreshCw, LayoutDashboard, Database, HelpCircle, Sparkles, ShieldCheck, ShieldAlert, Save, Link, Info } from 'lucide-react';
 import { LokiConfig, LogEntry, AnalysisResult, AppState } from './types';
 import { fetchLogs, testConnection } from './services/lokiService';
 import { analyzeLogsWithAI } from './services/geminiService';
@@ -23,7 +23,6 @@ const App: React.FC = () => {
 
   const isAiReady = !!process.env.API_KEY && process.env.API_KEY !== 'undefined' && process.env.API_KEY !== '';
 
-  // Load config on mount
   useEffect(() => {
     const savedConfig = localStorage.getItem('loki_ai_config');
     if (savedConfig) {
@@ -46,9 +45,9 @@ const App: React.FC = () => {
     const isOk = await testConnection(config);
     setState(AppState.IDLE);
     if (isOk) {
-      setSuccessMessage("Соединение с Loki успешно установлено!");
+      setSuccessMessage("Соединение с Loki успешно установлено через прокси!");
     } else {
-      setErrorMessage("Не удалось подключиться к Loki. Проверьте URL и токен.");
+      setErrorMessage("Не удалось подключиться к Loki. Проверьте LOKI_BACKEND_URL в docker-compose.");
     }
   };
 
@@ -76,16 +75,16 @@ const App: React.FC = () => {
         } else {
           setState(AppState.IDLE);
           setActiveTab('logs');
-          setErrorMessage("Логи успешно загружены, но AI анализ недоступен (отсутствует API ключ Gemini).");
+          setErrorMessage("Логи загружены. AI анализ недоступен (нет API ключа).");
         }
       } else {
         setState(AppState.IDLE);
-        setErrorMessage("Логи не найдены по данному запросу.");
+        setErrorMessage("Логи не найдены.");
       }
     } catch (err: any) {
       console.error(err);
       setState(AppState.ERROR);
-      setErrorMessage(err.message || "Ошибка подключения. Убедитесь, что Loki доступен через прокси /loki-proxy");
+      setErrorMessage(err.message || "Ошибка подключения к Loki.");
     }
   };
 
@@ -201,18 +200,26 @@ const App: React.FC = () => {
             <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="space-y-2">
                 <h2 className="text-3xl font-bold text-white">Конфигурация Loki</h2>
-                <p className="text-slate-400">Настройте источник данных для анализа.</p>
+                <p className="text-slate-400">Настройте подключение к вашему инстансу Loki.</p>
               </div>
               
               <div className="bg-slate-900 rounded-2xl p-8 border border-slate-800 space-y-6 shadow-xl">
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-300">Loki URL</label>
+                  <label className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                    Loki URL
+                    <div className="group relative">
+                        <Info size={14} className="text-slate-500 cursor-help" />
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2 bg-slate-800 text-[10px] text-slate-300 rounded shadow-xl border border-slate-700 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                            Рекомендуется оставить <b>/loki-proxy</b>. Реальный адрес (192.168.20.96) настраивается в docker-compose через переменную LOKI_BACKEND_URL.
+                        </div>
+                    </div>
+                  </label>
                   <input
                     type="text"
                     value={config.url}
                     onChange={(e) => setConfig({ ...config, url: e.target.value })}
                     placeholder="/loki-proxy"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all placeholder:text-slate-600 font-mono text-sm"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all font-mono text-sm"
                   />
                 </div>
 
