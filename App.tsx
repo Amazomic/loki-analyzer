@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Settings, Terminal, Activity, AlertCircle, RefreshCw, Database, Sparkles, ShieldCheck, Link, ChevronRight, Info, XCircle, Check, X, Search, ListFilter, Clock, LayoutDashboard, Key, Cpu, RefreshCcw } from 'lucide-react';
+import { Settings, Terminal, Activity, AlertCircle, RefreshCw, Database, Sparkles, ShieldCheck, Link, ChevronRight, Info, XCircle, Check, X, Search, ListFilter, Clock, LayoutDashboard, Key, Cpu, RefreshCcw, ChevronDown, ChevronUp } from 'lucide-react';
 import { LokiConfig, LogEntry, AnalysisResult, AppState, AIProvider } from './types';
 import { fetchLogs, testConnection } from './services/lokiService';
 import { analyzeLogsWithAI, fetchAvailableModels } from './services/aiService';
@@ -25,6 +25,7 @@ const App: React.FC = () => {
   const [state, setState] = useState<AppState>(AppState.IDLE);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isLogsCollapsed, setIsLogsCollapsed] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   const [availableModels, setAvailableModels] = useState<{id: string, name: string}[]>([]);
@@ -50,7 +51,6 @@ const App: React.FC = () => {
     setAvailableModels(models);
     setIsLoadingModels(false);
     
-    // Если текущая модель не в списке, выбираем первую доступную
     if (models.length > 0 && !models.find(m => m.id === config.aiModel)) {
       setConfig(prev => ({ ...prev, aiModel: models[0].id }));
     }
@@ -89,6 +89,7 @@ const App: React.FC = () => {
       setState(AppState.FETCHING);
       const fetchedLogs = await fetchLogs(config);
       setLogs(fetchedLogs);
+      setIsLogsCollapsed(false);
       setState(AppState.IDLE);
     } catch (err: any) {
       setState(AppState.ERROR);
@@ -109,10 +110,10 @@ const App: React.FC = () => {
 
       if (currentLogs.length > 0) {
         setState(AppState.ANALYZING);
+        setIsLogsCollapsed(true);
         const aiResult = await analyzeLogsWithAI(currentLogs, config);
         setAnalysis(aiResult);
         setState(AppState.IDLE);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
         setState(AppState.IDLE);
         setErrorMessage("Логи не найдены для анализа.");
@@ -143,7 +144,6 @@ const App: React.FC = () => {
             </div>
             
             <div className="p-8 space-y-8 overflow-y-auto custom-scrollbar">
-              {/* Loki Section */}
               <div className="space-y-4">
                 <h4 className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Источник данных (Loki)</h4>
                 <div className="space-y-2">
@@ -160,7 +160,6 @@ const App: React.FC = () => {
                 </div>
               </div>
 
-              {/* AI Section */}
               <div className="space-y-4 pt-4 border-t border-slate-800/50">
                 <h4 className="text-[10px] font-bold text-purple-500 uppercase tracking-widest">Интеллект (AI Provider)</h4>
                 
@@ -319,12 +318,6 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {analysis && (
-          <section className="animate-in slide-in-from-top-4 duration-700">
-            <Dashboard logs={logs} analysis={analysis} />
-          </section>
-        )}
-
         <section className="space-y-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -392,59 +385,76 @@ const App: React.FC = () => {
             </button>
           </div>
 
-          <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl flex flex-col min-h-[500px]">
-            <div className="p-3 bg-slate-800/40 border-b border-slate-800 flex items-center justify-between">
+          <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl flex flex-col transition-all duration-300 ease-in-out">
+            <div 
+              className="p-3 bg-slate-800/40 border-b border-slate-800 flex items-center justify-between cursor-pointer hover:bg-slate-800/60 transition-colors"
+              onClick={() => setIsLogsCollapsed(!isLogsCollapsed)}
+            >
               <div className="flex items-center gap-2">
                 <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
                 <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Поток данных</span>
+                {logs.length > 0 && (
+                  <div className="text-[9px] font-mono text-slate-400 bg-slate-950 px-2 py-0.5 rounded-md border border-slate-800 ml-2">
+                    {logs.length} RECORDS
+                  </div>
+                )}
               </div>
-              <div className="text-[9px] font-mono text-slate-400 bg-slate-950 px-2 py-0.5 rounded-md border border-slate-800">
-                {logs.length} RECORDS
+              <div className="text-slate-500">
+                {isLogsCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
               </div>
             </div>
-            <div className="flex-1 p-3 font-mono text-[10px] leading-tight overflow-x-auto custom-scrollbar bg-slate-950/20">
-              {logs.length > 0 ? (
-                <table className="w-full border-separate border-spacing-y-0.5">
-                  <tbody>
-                    {logs.map((log, idx) => (
-                      <tr key={idx} className="hover:bg-slate-800/40 transition-colors group">
-                        <td className="pr-3 py-0.5 text-slate-600 align-top whitespace-nowrap tabular-nums opacity-60 group-hover:opacity-100 transition-opacity">
-                          {new Date(log.timestamp).toLocaleTimeString()}
-                        </td>
-                        <td className="pr-3 py-0.5 align-top">
-                          <span className={`px-1 py-0 rounded text-[8px] font-black uppercase tracking-tighter border ${
-                            log.level === 'error' ? 'text-red-400 bg-red-400/10 border-red-500/20' :
-                            log.level === 'warn' ? 'text-amber-400 bg-amber-400/10 border-amber-500/20' :
-                            'text-slate-500 bg-slate-800/50 border-slate-700/30'
-                          }`}>
-                            {log.level}
-                          </span>
-                        </td>
-                        <td className="py-0.5 text-slate-400 group-hover:text-slate-100 break-all transition-colors font-mono">
-                          {log.line}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <div className="h-full flex flex-col items-center justify-center text-slate-700 py-32 space-y-4">
-                  <div className="relative">
-                    <Database size={48} className="opacity-10" />
-                    <Search className="absolute -bottom-1 -right-1 text-slate-800" size={20} />
+            
+            <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isLogsCollapsed ? 'max-h-0' : 'max-h-[500px]'}`}>
+              <div className="p-3 font-mono text-[10px] leading-tight overflow-x-auto custom-scrollbar bg-slate-950/20 min-h-[300px]">
+                {logs.length > 0 ? (
+                  <table className="w-full border-separate border-spacing-y-0.5">
+                    <tbody>
+                      {logs.map((log, idx) => (
+                        <tr key={idx} className="hover:bg-slate-800/40 transition-colors group">
+                          <td className="pr-3 py-0.5 text-slate-600 align-top whitespace-nowrap tabular-nums opacity-60 group-hover:opacity-100 transition-opacity">
+                            {new Date(log.timestamp).toLocaleTimeString()}
+                          </td>
+                          <td className="pr-3 py-0.5 align-top">
+                            <span className={`px-1 py-0 rounded text-[8px] font-black uppercase tracking-tighter border ${
+                              log.level === 'error' ? 'text-red-400 bg-red-400/10 border-red-500/20' :
+                              log.level === 'warn' ? 'text-amber-400 bg-amber-400/10 border-amber-500/20' :
+                              'text-slate-500 bg-slate-800/50 border-slate-700/30'
+                            }`}>
+                              {log.level}
+                            </span>
+                          </td>
+                          <td className="py-0.5 text-slate-400 group-hover:text-slate-100 break-all transition-colors font-mono">
+                            {log.line}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center text-slate-700 py-32 space-y-4">
+                    <div className="relative">
+                      <Database size={48} className="opacity-10" />
+                      <Search className="absolute -bottom-1 -right-1 text-slate-800" size={20} />
+                    </div>
+                    <p className="text-xs font-medium opacity-50">Данные не загружены.</p>
                   </div>
-                  <p className="text-xs font-medium opacity-50">Данные не загружены.</p>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </section>
+
+        {analysis && (
+          <section className="animate-in fade-in slide-in-from-top-4 duration-700">
+            <Dashboard logs={logs} analysis={analysis} />
+          </section>
+        )}
       </main>
 
       <footer className="max-w-7xl mx-auto px-10 py-10 border-t border-slate-900 flex flex-col md:flex-row items-center justify-between gap-6 opacity-40 hover:opacity-100 transition-opacity">
         <div className="flex items-center gap-3">
           <Activity size={16} />
-          <span className="font-bold text-[10px] uppercase tracking-[0.2em]">Loki AI Engine v2.3</span>
+          <span className="font-bold text-[10px] uppercase tracking-[0.2em]">Loki AI Engine v2.4</span>
         </div>
         <p className="text-[9px] text-slate-500 font-medium">© 2024 Анализатор логов. Обработка: {config.aiProvider.toUpperCase()}.</p>
       </footer>
