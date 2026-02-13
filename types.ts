@@ -32,7 +32,9 @@ export interface Recommendation {
 
 export enum AppState {
   IDLE = 'IDLE',
+  TESTING = 'TESTING',
   FETCHING = 'FETCHING',
   ANALYZING = 'ANALYZING',
-  ERROR = 'ERROR'
+  ERROR = 'ERROR',
+  SUCCESS = 'SUCCESS'
 }
