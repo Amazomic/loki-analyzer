@@ -1,8 +1,26 @@
 
 import { LogEntry, LokiConfig } from '../types';
 
+/**
+ * Проверяет, нужно ли использовать прокси.
+ * Если адрес совпадает с тем, что настроен в Docker, мы идем через /loki-proxy,
+ * чтобы избежать CORS ошибок в браузере.
+ */
+const resolveUrl = (inputUrl: string): string => {
+  const targetLoki = process.env.LOKI_URL || 'http://192.168.20.96:3100';
+  
+  // Убираем слеши в конце для сравнения
+  const cleanInput = inputUrl.replace(/\/+$/, '');
+  const cleanTarget = targetLoki.replace(/\/+$/, '');
+
+  if (cleanInput === cleanTarget || inputUrl === '/loki-proxy') {
+    return '/loki-proxy';
+  }
+  return inputUrl;
+};
+
 export const testConnection = async (config: LokiConfig): Promise<boolean> => {
-  const { url, token } = config;
+  const url = resolveUrl(config.url);
   const baseUrl = url.endsWith('/') ? url.slice(0, -1) : url;
   const endpoint = `${baseUrl}/loki/api/v1/labels`;
   
@@ -10,12 +28,8 @@ export const testConnection = async (config: LokiConfig): Promise<boolean> => {
     'Accept': 'application/json',
   };
 
-  if (token) {
-    if (token.includes('Basic') || token.includes('Bearer')) {
-        headers['Authorization'] = token;
-    } else {
-        headers['Authorization'] = `Bearer ${token}`;
-    }
+  if (config.token) {
+    headers['Authorization'] = config.token.includes(' ') ? config.token : `Bearer ${config.token}`;
   }
 
   try {
@@ -31,14 +45,13 @@ export const testConnection = async (config: LokiConfig): Promise<boolean> => {
 };
 
 export const fetchLogs = async (config: LokiConfig): Promise<LogEntry[]> => {
-  const { url, token, query, limit } = config;
-  
+  const url = resolveUrl(config.url);
   const baseUrl = url.endsWith('/') ? url.slice(0, -1) : url;
   const endpoint = `${baseUrl}/loki/api/v1/query_range`;
   
   const params = new URLSearchParams({
-    query,
-    limit: limit.toString(),
+    query: config.query,
+    limit: config.limit.toString(),
     direction: 'backward',
   });
 
@@ -46,12 +59,8 @@ export const fetchLogs = async (config: LokiConfig): Promise<LogEntry[]> => {
     'Accept': 'application/json',
   };
 
-  if (token) {
-    if (token.includes('Basic') || token.includes('Bearer')) {
-        headers['Authorization'] = token;
-    } else {
-        headers['Authorization'] = `Bearer ${token}`;
-    }
+  if (config.token) {
+    headers['Authorization'] = config.token.includes(' ') ? config.token : `Bearer ${config.token}`;
   }
 
   try {

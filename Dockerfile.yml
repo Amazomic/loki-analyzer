@@ -11,9 +11,11 @@ RUN npm install
 # Copy source and build
 COPY . .
 
-# Argument from docker-compose
+# Arguments from docker-compose
 ARG API_KEY
+ARG LOKI_URL
 ENV API_KEY=$API_KEY
+ENV LOKI_URL=$LOKI_URL
 
 RUN npm run build
 
@@ -21,7 +23,6 @@ RUN npm run build
 FROM nginx:alpine
 
 # Copy nginx config as a template for envsubst
-# Nginx image automatically processes files in /etc/nginx/templates/*.template
 COPY nginx.conf /etc/nginx/templates/default.conf.template
 
 # Copy built assets
