@@ -12,7 +12,7 @@ const App: React.FC = () => {
   const [config, setConfig] = useState<LokiConfig>({
     url: defaultLokiUrl,
     token: '',
-    query: '{job="varlogs"}',
+    query: '{host="test_web.185",service_name="/akuz_web"}',
     limit: 100,
     range: '6h',
     aiProvider: 'gemini',
