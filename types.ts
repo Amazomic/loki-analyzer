@@ -4,6 +4,7 @@ export interface LokiConfig {
   token: string;
   query: string;
   limit: number;
+  range: string; // Период: 1h, 6h, 24h, 7d и т.д.
 }
 
 export interface LogEntry {
