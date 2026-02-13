@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.yml
+      network: host
       args:
         - API_KEY=${GEMINI_API_KEY}
     ports:
